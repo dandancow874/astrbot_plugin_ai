@@ -1070,7 +1070,7 @@ class BigBanana(Star):
 
     @filter.command("lmp")
     async def add_prompt_quick_command(
-        self, event: AstrMessageEvent, trigger_word: str = "", *prompt_parts: str
+        self, event: AstrMessageEvent, trigger_word: str = "", prompt_str: str = ""
     ):
         if not self.is_global_admin(event):
             logger.info(
@@ -1078,13 +1078,85 @@ class BigBanana(Star):
             )
             return
 
-        if not trigger_word or not prompt_parts:
-            yield event.plain_result("❌ 用法：lmp <触发词> <提示词内容>")
-            return
+        raw = (event.message_str or "").strip()
+        if not trigger_word:
+            tokens = raw.split()
+            if len(tokens) >= 2:
+                trigger_word = tokens[1]
+            else:
+                yield event.plain_result("❌ 用法：lmp <触发词> <提示词内容>")
+                return
 
-        prompt_str = " ".join(prompt_parts).strip()
-        if not prompt_str:
-            yield event.plain_result("❌ 用法：lmp <触发词> <提示词内容>")
+        if raw and trigger_word in raw:
+            suffix = raw.split(trigger_word, 1)[1].strip()
+            if suffix:
+                prompt_str = suffix
+
+        if not prompt_str.strip():
+            yield event.plain_result(
+                f"📝 请发送提示词内容（用于触发词「{trigger_word}」），30 秒内有效。"
+            )
+
+            @session_waiter(timeout=30, record_history_chains=False)  # type: ignore
+            async def waiter(controller: SessionController, event: AstrMessageEvent):
+                if not self.is_global_admin(event):
+                    logger.info(
+                        f"用户 {event.get_sender_id()} 试图执行管理员命令 lmp，权限不足"
+                    )
+                    return
+
+                reply = (event.message_str or "").strip()
+                if not reply:
+                    await event.send(
+                        event.plain_result("❌ 提示词内容不能为空，请重新发送。")
+                    )
+                    return
+
+                build_prompt = f"{trigger_word} {reply}"
+                action = "添加"
+
+                if trigger_word in self.prompt_dict:
+                    action = "更新"
+                    for i, v in enumerate(self.prompt_list):
+                        cmd, _, existing_prompt_str = v.strip().partition(" ")
+                        if cmd == trigger_word:
+                            self.prompt_list[i] = build_prompt
+                            break
+                        if cmd.startswith("[") and cmd.endswith("]"):
+                            cmd_list = cmd[1:-1].split(",")
+                            if trigger_word in cmd_list:
+                                cmd_list.remove(trigger_word)
+                                if len(cmd_list) == 1:
+                                    new_config_item = (
+                                        f"{cmd_list[0]} {existing_prompt_str}"
+                                    )
+                                else:
+                                    new_cmd = "[" + ",".join(cmd_list) + "]"
+                                    new_config_item = f"{new_cmd} {existing_prompt_str}"
+                                self.prompt_list[i] = new_config_item
+                                self.prompt_list.append(build_prompt)
+                                break
+                else:
+                    self.prompt_list.append(build_prompt)
+
+                self.conf.save_config()
+                self.init_prompts()
+                await event.send(
+                    event.plain_result(
+                        f"✅ 已成功{action}提示词：「{trigger_word}」"
+                    )
+                )
+                controller.stop()
+
+            try:
+                await waiter(event)
+            except TimeoutError:
+                yield event.plain_result("❌ 超时了，操作已取消！")
+            except Exception as e:
+                logger.error(f"lmp 追加提示词出现错误: {e}", exc_info=True)
+                yield event.plain_result("❌ 处理时发生了一个内部错误。")
+            finally:
+                event.stop_event()
             return
 
         build_prompt = f"{trigger_word} {prompt_str}"
@@ -1116,7 +1188,7 @@ class BigBanana(Star):
         self.init_prompts()
         yield event.plain_result(f"✅ 已成功{action}提示词：「{trigger_word}」")
 
-    @filter.command("lm列表", alias={"lml"})
+    @filter.command("lm列表", alias={"lml", "lmpl"})
     async def list_prompts_command(self, event: AstrMessageEvent):
         """lm列表"""
         if not self.is_global_admin(event):
