@@ -46,6 +46,25 @@ class GeminiProvider(BaseProvider):
                 if isinstance(provider_config.tls_verify, bool)
                 else True
             )
+            async def aiohttp_post() -> tuple[int, str, dict | None]:
+                import aiohttp
+
+                ssl = None if verify else False
+                timeout = aiohttp.ClientTimeout(total=self.def_common_config.timeout)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(
+                        url,
+                        headers=headers,
+                        json=gemini_context,
+                        proxy=self.def_common_config.proxy,
+                        ssl=ssl,
+                    ) as resp:
+                        text = await resp.text()
+                        try:
+                            data = json.loads(text)
+                        except Exception:
+                            data = None
+                        return resp.status, text, data
             req_kwargs = {
                 "proxy": self.def_common_config.proxy,
                 "timeout": self.def_common_config.timeout,
@@ -53,15 +72,26 @@ class GeminiProvider(BaseProvider):
             }
             if impersonate:
                 req_kwargs["impersonate"] = impersonate
-            response = await self.session.post(
-                url,
-                headers=headers,
-                json=gemini_context,
-                **req_kwargs,
-            )
-            # 响应反序列化
-            result = response.json()
-            if response.status_code == 200:
+            status_code = None
+            response_text = None
+            result = None
+            try:
+                response = await self.session.post(
+                    url,
+                    headers=headers,
+                    json=gemini_context,
+                    **req_kwargs,
+                )
+                status_code = response.status_code
+                response_text = response.text
+                result = response.json()
+            except Exception as e:
+                if "curl: (35)" in str(e) or "TLS connect error" in str(e):
+                    status_code, response_text, result = await aiohttp_post()
+                else:
+                    raise
+
+            if status_code == 200:
                 b64_images = []
                 for item in result.get("candidates", []):
                     # 检查 finishReason 状态
@@ -74,13 +104,13 @@ class GeminiProvider(BaseProvider):
                                 b64_images.append((data["mimeType"], data["data"]))
                     else:
                         logger.warning(
-                            f"[BIG BANANA] 图片生成失败, 响应内容: {response.text[:1024]}"
+                            f"[BIG BANANA] 图片生成失败, 响应内容: {(response_text or '')[:1024]}"
                         )
                         return None, 200, f"图片生成失败，原因: {finishReason}"
                 # 最后再检查是否有图片数据
                 if not b64_images:
                     logger.warning(
-                        f"[BIG BANANA] 请求成功，但未返回图片数据, 响应内容: {response.text[:1024]}"
+                        f"[BIG BANANA] 请求成功，但未返回图片数据, 响应内容: {(response_text or '')[:1024]}"
                     )
                     if result.get("promptFeedback", {}):
                         return (
@@ -92,10 +122,10 @@ class GeminiProvider(BaseProvider):
                 return b64_images, 200, None
             else:
                 logger.error(
-                    f"[BIG BANANA] 图片生成失败，状态码: {response.status_code}, 响应内容: {response.text[:1024]}"
+                    f"[BIG BANANA] 图片生成失败，状态码: {status_code}, 响应内容: {(response_text or '')[:1024]}"
                 )
                 err_msg = result.get("error", {}).get("message", "未知原因")
-                return None, response.status_code, f"图片生成失败：{err_msg}"
+                return None, status_code, f"图片生成失败：{err_msg}"
         except Timeout as e:
             logger.error(f"[BIG BANANA] 网络请求超时: {e}")
             return None, 408, "图片生成失败：响应超时"

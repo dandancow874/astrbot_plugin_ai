@@ -404,13 +404,13 @@ class BigBanana(Star):
                 def build_provider_item(conf: dict, suffix: str) -> dict:
                     api_base_mapping = {
                         "t8star": "https://ai.t8star.cn",
-                        "hk": "https://hk-api.gptbest.vip",
-                        "us": "https://api.gptbest.vip",
                     }
                     api_type = conf.get("api_type", None)
                     if not isinstance(api_type, str) or not api_type.strip():
                         api_type = default_provider_stub.get("api_type")
                     api_type = str(api_type).strip()
+                    if conf_key == "nanobanana_config":
+                        api_type = "Gemini"
 
                     item = dict(default_provider_stub)
                     item["api_type"] = api_type

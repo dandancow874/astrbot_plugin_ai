@@ -2,6 +2,7 @@ import json
 import re
 from urllib.parse import parse_qs, urlparse
 
+import aiohttp
 from bs4 import BeautifulSoup
 from curl_cffi import AsyncSession
 from curl_cffi.requests.exceptions import Timeout
@@ -80,17 +81,44 @@ class VertexAIAnonymousProvider(BaseProvider):
             "Content-Type": "application/json",
         }
         try:
-            response = await self.session.post(
-                url=f"{self.vertex_ai_anonymous_config.vertex_ai_anonymous_base_api}/v3/entityServices/AiplatformEntityService/schemas/AIPLATFORM_GRAPHQL:batchGraphql?key=AIzaSyCI-zsRP85UVOi0DjtiCwWBwQ1djDy741g&prettyPrint=false",
-                headers=headers,
-                json=body,
-                timeout=self.def_common_config.timeout,
-                impersonate="chrome131",
-                proxy=self.def_common_config.proxy,
-                verify=self.vertex_ai_anonymous_config.tls_verify,
-            )
-            result = response.json()
-            if response.status_code == 200:
+            url = f"{self.vertex_ai_anonymous_config.vertex_ai_anonymous_base_api}/v3/entityServices/AiplatformEntityService/schemas/AIPLATFORM_GRAPHQL:batchGraphql?key=AIzaSyCI-zsRP85UVOi0DjtiCwWBwQ1djDy741g&prettyPrint=false"
+            status_code = None
+            response_text = None
+            result = None
+            try:
+                response = await self.session.post(
+                    url=url,
+                    headers=headers,
+                    json=body,
+                    timeout=self.def_common_config.timeout,
+                    impersonate="chrome131",
+                    proxy=self.def_common_config.proxy,
+                    verify=self.vertex_ai_anonymous_config.tls_verify,
+                )
+                status_code = response.status_code
+                response_text = response.text
+                result = response.json()
+            except Exception as e:
+                if "curl: (35)" not in str(e) and "TLS connect error" not in str(e):
+                    raise
+                ssl = None if self.vertex_ai_anonymous_config.tls_verify else False
+                timeout = aiohttp.ClientTimeout(total=self.def_common_config.timeout)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(
+                        url,
+                        headers=headers,
+                        json=body,
+                        proxy=self.def_common_config.proxy,
+                        ssl=ssl,
+                    ) as resp:
+                        status_code = resp.status
+                        response_text = await resp.text()
+                        try:
+                            result = json.loads(response_text)
+                        except Exception:
+                            result = None
+
+            if status_code == 200 and isinstance(result, list):
                 b64_images = []
                 # 遍历每一个元素
                 for elem in result:
@@ -106,7 +134,7 @@ class VertexAIAnonymousProvider(BaseProvider):
                             )
                             err_msg = err.get("message", "")
                             logger.error(
-                                f"[BIG BANANA] 图片生成失败，错误代码：{status}，错误原因：{err_msg}，响应内容：{response.text[:1024]}"
+                                f"[BIG BANANA] 图片生成失败，错误代码：{status}，错误原因：{err_msg}，响应内容：{(response_text or '')[:1024]}"
                             )
                             return None, status, err_msg
                         # 没有错误，应该是正常响应
@@ -125,31 +153,31 @@ class VertexAIAnonymousProvider(BaseProvider):
                                         )
                             else:
                                 logger.warning(
-                                    f"[BIG BANANA] 图片生成失败, 响应内容: {response.text[:1024]}"
+                                    f"[BIG BANANA] 图片生成失败, 响应内容: {(response_text or '')[:1024]}"
                                 )
                                 return None, 999, f"图片生成失败，原因: {finishReason}"
                 # 最后再检查是否有图片数据
                 if not b64_images:
                     logger.warning(
-                        f"[BIG BANANA] 请求成功，但未返回图片数据, 响应内容: {response.text[:1024]}"
+                        f"[BIG BANANA] 请求成功，但未返回图片数据, 响应内容: {(response_text or '')[:1024]}"
                     )
                     return None, 999, "响应中未包含图片数据"
                 return b64_images, None, None
             else:
                 logger.error(
-                    f"[BIG BANANA] 图片生成失败，状态码: {response.status_code}, 响应内容: {response.text[:1024]}"
+                    f"[BIG BANANA] 图片生成失败，状态码: {status_code}, 响应内容: {(response_text or '')[:1024]}"
                 )
                 return (
                     None,
                     None,
-                    f"图片生成失败：状态码: {response.status_code}",
+                    f"图片生成失败：状态码: {status_code}",
                 )
         except Timeout as e:
             logger.error(f"[BIG BANANA] 网络请求超时: {e}")
             return None, None, "图片生成失败：响应超时"
         except json.JSONDecodeError as e:
             logger.error(
-                f"[BIG BANANA] JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{response.text[:1024]}"
+                f"[BIG BANANA] JSON反序列化错误: {e}"
             )
             return None, None, "图片生成失败：响应内容格式错误"
         except Exception as e:
@@ -190,7 +218,6 @@ class VertexAIAnonymousProvider(BaseProvider):
                 "maxOutputTokens": 32768,
                 "responseModalities": responseModalities,
                 "imageConfig": {
-                    "imageOutputOptions": {"mimeType": "image/png"},    # 这个修改是无效的
                     "personGeneration": "ALLOW_ALL",
                 },
             },
@@ -252,16 +279,31 @@ class VertexAIAnonymousProvider(BaseProvider):
 
     async def _execute_recaptcha(self, anchor_url: str, reload_url: str) -> str | None:
         try:
-            anchor_html = await self.session.get(
-                anchor_url,
-                impersonate="chrome131",
-                proxy=self.def_common_config.proxy,
-                verify=self.vertex_ai_anonymous_config.tls_verify,
-            )
+            anchor_text = None
+            try:
+                anchor_html = await self.session.get(
+                    anchor_url,
+                    impersonate="chrome131",
+                    proxy=self.def_common_config.proxy,
+                    verify=self.vertex_ai_anonymous_config.tls_verify,
+                )
+                anchor_text = anchor_html.text
+            except Exception as e:
+                if "curl: (35)" not in str(e) and "TLS connect error" not in str(e):
+                    raise
+                ssl = None if self.vertex_ai_anonymous_config.tls_verify else False
+                timeout = aiohttp.ClientTimeout(total=30)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(
+                        anchor_url,
+                        proxy=self.def_common_config.proxy,
+                        ssl=ssl,
+                    ) as resp:
+                        anchor_text = await resp.text()
         except Exception as e:
             logger.error(f"[BIG BANANA] 请求 recaptcha anchor 失败: {e}")
             return None
-        soup = BeautifulSoup(anchor_html.text, "html.parser")
+        soup = BeautifulSoup(anchor_text or "", "html.parser")
         token_element = soup.find("input", {"id": "recaptcha-token"})
         if token_element is None:
             logger.error("[BIG BANANA] anchor_html 未找到 recaptcha-token 元素")
@@ -278,27 +320,41 @@ class VertexAIAnonymousProvider(BaseProvider):
             "co": params["co"][0],
             "hl": params["hl"][0],
             "size": "invisible",
-            "vh": "6581054572",
-            "chr": "",
-            "bg": "",  # 这个太长了，而且好像不需要
         }
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
         }
         try:
-            reload_response = await self.session.post(
-                reload_url,
-                data=payload,
-                headers=headers,
-                impersonate="chrome131",
-                proxy=self.def_common_config.proxy,
-                verify=self.vertex_ai_anonymous_config.tls_verify,
-            )
+            reload_text = None
+            try:
+                reload_response = await self.session.post(
+                    reload_url,
+                    data=payload,
+                    headers=headers,
+                    impersonate="chrome131",
+                    proxy=self.def_common_config.proxy,
+                    verify=self.vertex_ai_anonymous_config.tls_verify,
+                )
+                reload_text = reload_response.text
+            except Exception as e:
+                if "curl: (35)" not in str(e) and "TLS connect error" not in str(e):
+                    raise
+                ssl = None if self.vertex_ai_anonymous_config.tls_verify else False
+                timeout = aiohttp.ClientTimeout(total=30)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(
+                        reload_url,
+                        data=payload,
+                        headers=headers,
+                        proxy=self.def_common_config.proxy,
+                        ssl=ssl,
+                    ) as resp:
+                        reload_text = await resp.text()
         except Exception as e:
             logger.error(f"[BIG BANANA] 请求 recaptcha reload 失败: {e}")
             return None
         # 解析响应内容
-        match = re.search(r'rresp","(.*?)"', reload_response.text)
+        match = re.search(r'rresp","(.*?)"', reload_text or "")
         if not match:
             logger.error("[BIG BANANA] 未找到 rresp")
             return None

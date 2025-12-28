@@ -30,9 +30,9 @@
                     "api_base": {
                         "description": "API Base 预设",
                         "type": "string",
-                        "options": ["t8star", "ip", "hk", "us"],
+                        "options": ["t8star", "ip"],
                         "default": "t8star",
-                        "hint": "t8star=ai.t8star.cn；ip=自定义；hk/us 为历史站点（若不可用请改用 t8star 或自定义）。"
+                        "hint": "t8star=ai.t8star.cn；ip=自定义。"
                     },
                     "custom_ip": {
                         "description": "自定义 Base URL",
@@ -43,9 +43,9 @@
                     "api_type": {
                         "description": "接口类型",
                         "type": "string",
-                        "options": ["Gemini", "Vertex_AI_Anonymous"],
+                        "options": ["Gemini"],
                         "default": "Gemini",
-                        "hint": "Vertex_AI_Anonymous 不需要 Key。"
+                        "hint": ""
                     },
                     "api_url": {
                         "description": "Gemini URL",
@@ -84,7 +84,7 @@
                     "api_base": {
                         "description": "API Base 预设",
                         "type": "string",
-                        "options": ["t8star", "ip", "hk", "us"],
+                        "options": ["t8star", "ip"],
                         "default": "t8star"
                     },
                     "custom_ip": {
@@ -95,9 +95,9 @@
                     "api_type": {
                         "description": "接口类型",
                         "type": "string",
-                        "options": ["Gemini", "Vertex_AI_Anonymous"],
+                        "options": ["Gemini"],
                         "default": "Gemini",
-                        "hint": "留空表示不启用备用。Vertex_AI_Anonymous 不需要 Key。"
+                        "hint": "留空表示不启用备用。"
                     },
                     "api_url": {
                         "description": "Gemini URL",
@@ -148,7 +148,7 @@
                     "api_url": {
                         "description": "OpenAI兼容 URL",
                         "type": "string",
-                        "default": "https://api.openai.com/v1",
+                        "default": "https://ai.gitee.com/v1",
                         "hint": "填 Base URL，例如 https://ai.gitee.com/v1。"
                     },
                     "api_key": {
