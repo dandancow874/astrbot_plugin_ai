@@ -1205,7 +1205,7 @@ class BigBanana(Star):
         msg = "📜 当前预设提示词列表：\n" + "、".join(prompts)
         yield event.plain_result(msg)
 
-    @filter.command("lm提示词", alias={"lmc", "lm详情"})
+    @filter.command("lm提示词", alias={"lmc", "lm详情", "lmps"})
     async def prompt_details(self, event: AstrMessageEvent, trigger_word: str):
         """获取提示词详情字符串"""
         if trigger_word not in self.prompt_dict:
