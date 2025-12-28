@@ -437,6 +437,12 @@
                 "default": "https://cloudconsole-pa.clients6.google.com",
                 "hint": "考虑到网络环境或者IP频繁的情况，可以在这里配置反向代理"
             },
+            "tls_verify": {
+                "description": "TLS证书校验",
+                "type": "bool",
+                "default": true,
+                "hint": "关闭可绕过证书错误（例如 curl: (60)），但存在安全风险。"
+            },
             "system_prompt": {
                 "description": "系统提示词",
                 "type": "text",

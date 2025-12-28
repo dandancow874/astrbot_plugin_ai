@@ -92,6 +92,8 @@ class BigBanana(Star):
                 return url
             if url.endswith("/v1"):
                 return f"{url}/chat/completions"
+            if url.endswith("/v1/async"):
+                return f"{url}/chat/completions"
             if "/v1/" not in url and url.count("/") <= 2:
                 return f"{url}/v1/chat/completions"
             return url
@@ -101,7 +103,11 @@ class BigBanana(Star):
             url = url.rstrip("/")
             if "images/generations" in url:
                 return url
+            if "images/edits" in url or "images/variations" in url:
+                return url
             if url.endswith("/v1"):
+                return f"{url}/images/generations"
+            if url.endswith("/v1/async"):
                 return f"{url}/images/generations"
             if "/v1/" not in url and url.count("/") <= 2:
                 return f"{url}/v1/images/generations"
@@ -196,7 +202,7 @@ class BigBanana(Star):
             }
         )
 
-        body = {"model": model, "messages": messages, "stream": False}
+        body = {"model": model, "messages": messages, "stream": False, "max_tokens": 1024}
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {keys[0]}",
@@ -214,9 +220,14 @@ class BigBanana(Star):
             if response.status_code != 200:
                 msg = None
                 if isinstance(result, dict):
+                    if isinstance(result.get("message"), str):
+                        msg = result.get("message")
                     err = result.get("error")
-                    if isinstance(err, dict):
+                    if not msg and isinstance(err, dict):
                         msg = err.get("message")
+                logger.error(
+                    f"[BIG BANANA] Image-to-Prompt 失败，状态码: {response.status_code}, 响应内容: {response.text[:1024]}"
+                )
                 return f"❌ 反推失败：{msg or f'状态码 {response.status_code}'}"
 
             choices = result.get("choices") if isinstance(result, dict) else None

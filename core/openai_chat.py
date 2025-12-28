@@ -2,6 +2,7 @@ import json
 import re
 import base64
 
+from curl_cffi import CurlMime
 from curl_cffi.requests.exceptions import Timeout
 
 from astrbot.api import logger
@@ -373,7 +374,7 @@ class OpenAIImagesProvider(BaseProvider):
             "Authorization": f"Bearer {api_key}",
         }
 
-        form = {
+        form: dict = {
             "prompt": params.get("prompt", "anything"),
             "model": params.get("model", provider_config.model),
             "response_format": "b64_json",
@@ -382,7 +383,8 @@ class OpenAIImagesProvider(BaseProvider):
         if mapped_size:
             form["size"] = mapped_size
 
-        files: list[tuple[str, tuple[str, bytes, str]]] = []
+        mp = CurlMime()
+        has_any_image = False
         for idx, (mime, b64) in enumerate(image_b64_list):
             if not b64:
                 continue
@@ -391,9 +393,15 @@ class OpenAIImagesProvider(BaseProvider):
             except Exception:
                 continue
             ext = self._mime_to_ext(mime)
-            files.append(("image[]", (f"image_{idx}.{ext}", raw, mime or "image/png")))
+            mp.addpart(
+                name="image[]",
+                content_type=mime or "image/png",
+                filename=f"image_{idx}.{ext}",
+                data=raw,
+            )
+            has_any_image = True
 
-        if not files:
+        if not has_any_image:
             return None, 400, "图片编辑失败：输入图片格式错误"
 
         try:
@@ -401,7 +409,7 @@ class OpenAIImagesProvider(BaseProvider):
                 url=provider_config.api_url,
                 headers=headers,
                 data=form,
-                files=files,
+                multipart=mp,
                 timeout=self.def_common_config.timeout,
                 proxy=self.def_common_config.proxy,
             )

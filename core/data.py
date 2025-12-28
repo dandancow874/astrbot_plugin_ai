@@ -101,6 +101,8 @@ class VertexAIAnonymousConfig:
     """Recaptcha 基础 API 地址"""
     vertex_ai_anonymous_base_api: str = "https://cloudconsole-pa.clients6.google.com"
     """Vertex AI Anonymous 基础 API 地址"""
+    tls_verify: bool = True
+    """是否验证 TLS 证书"""
     system_prompt: str | None = None
     """系统提示词"""
     max_retry: int = 10

@@ -87,6 +87,7 @@ class VertexAIAnonymousProvider(BaseProvider):
                 timeout=self.def_common_config.timeout,
                 impersonate="chrome131",
                 proxy=self.def_common_config.proxy,
+                verify=self.vertex_ai_anonymous_config.tls_verify,
             )
             result = response.json()
             if response.status_code == 200:
@@ -250,10 +251,16 @@ class VertexAIAnonymousProvider(BaseProvider):
         return None
 
     async def _execute_recaptcha(self, anchor_url: str, reload_url: str) -> str | None:
-        # 获取初始化recaptcha_token
-        anchor_html = await self.session.get(
-            anchor_url, impersonate="chrome131", proxy=self.def_common_config.proxy
-        )
+        try:
+            anchor_html = await self.session.get(
+                anchor_url,
+                impersonate="chrome131",
+                proxy=self.def_common_config.proxy,
+                verify=self.vertex_ai_anonymous_config.tls_verify,
+            )
+        except Exception as e:
+            logger.error(f"[BIG BANANA] 请求 recaptcha anchor 失败: {e}")
+            return None
         soup = BeautifulSoup(anchor_html.text, "html.parser")
         token_element = soup.find("input", {"id": "recaptcha-token"})
         if token_element is None:
@@ -278,13 +285,18 @@ class VertexAIAnonymousProvider(BaseProvider):
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
         }
-        reload_response = await self.session.post(
-            reload_url,
-            data=payload,
-            headers=headers,
-            impersonate="chrome131",
-            proxy=self.def_common_config.proxy,
-        )
+        try:
+            reload_response = await self.session.post(
+                reload_url,
+                data=payload,
+                headers=headers,
+                impersonate="chrome131",
+                proxy=self.def_common_config.proxy,
+                verify=self.vertex_ai_anonymous_config.tls_verify,
+            )
+        except Exception as e:
+            logger.error(f"[BIG BANANA] 请求 recaptcha reload 失败: {e}")
+            return None
         # 解析响应内容
         match = re.search(r'rresp","(.*?)"', reload_response.text)
         if not match:
