@@ -1,6 +1,9 @@
 import json
 import re
 import base64
+import asyncio
+import time
+from urllib.parse import urlparse
 
 from curl_cffi import CurlMime
 from curl_cffi.requests.exceptions import Timeout
@@ -35,13 +38,30 @@ class OpenAIChatProvider(BaseProvider):
             params.get("model", provider_config.model), image_b64_list, params
         )
         try:
+            impersonate = (
+                provider_config.impersonate.strip()
+                if isinstance(provider_config.impersonate, str)
+                and provider_config.impersonate.strip()
+                else None
+            )
+            verify = (
+                provider_config.tls_verify
+                if isinstance(provider_config.tls_verify, bool)
+                else True
+            )
+            req_kwargs = {
+                "timeout": self.def_common_config.timeout,
+                "proxy": self.def_common_config.proxy,
+                "verify": verify,
+            }
+            if impersonate:
+                req_kwargs["impersonate"] = impersonate
             # 发送请求
             response = await self.session.post(
                 url=provider_config.api_url,
                 headers=headers,
                 json=openai_context,
-                timeout=self.def_common_config.timeout,
-                proxy=self.def_common_config.proxy,
+                **req_kwargs,
             )
             # 响应反序列化
             result = response.json()
@@ -125,13 +145,30 @@ class OpenAIChatProvider(BaseProvider):
             params.get("model", provider_config.model), image_b64_list, params
         )
         try:
+            impersonate = (
+                provider_config.impersonate.strip()
+                if isinstance(provider_config.impersonate, str)
+                and provider_config.impersonate.strip()
+                else None
+            )
+            verify = (
+                provider_config.tls_verify
+                if isinstance(provider_config.tls_verify, bool)
+                else True
+            )
+            req_kwargs = {
+                "proxy": self.def_common_config.proxy,
+                "verify": verify,
+            }
+            if impersonate:
+                req_kwargs["impersonate"] = impersonate
             # 发送请求
             response = await self.session.post(
                 url=provider_config.api_url,
                 headers=headers,
                 json=openai_context,
-                proxy=self.def_common_config.proxy,
                 stream=True,
+                **req_kwargs,
             )
             # 处理流式响应
             streams = response.aiter_content(chunk_size=1024)
@@ -292,12 +329,29 @@ class OpenAIImagesProvider(BaseProvider):
             body["size"] = mapped_size
 
         try:
+            impersonate = (
+                provider_config.impersonate.strip()
+                if isinstance(provider_config.impersonate, str)
+                and provider_config.impersonate.strip()
+                else None
+            )
+            verify = (
+                provider_config.tls_verify
+                if isinstance(provider_config.tls_verify, bool)
+                else True
+            )
+            req_kwargs = {
+                "timeout": self.def_common_config.timeout,
+                "proxy": self.def_common_config.proxy,
+                "verify": verify,
+            }
+            if impersonate:
+                req_kwargs["impersonate"] = impersonate
             response = await self.session.post(
                 url=provider_config.api_url,
                 headers=headers,
                 json=body,
-                timeout=self.def_common_config.timeout,
-                proxy=self.def_common_config.proxy,
+                **req_kwargs,
             )
             result = response.json()
             if response.status_code == 200:
@@ -394,26 +448,111 @@ class OpenAIImagesProvider(BaseProvider):
                 continue
             ext = self._mime_to_ext(mime)
             mp.addpart(
-                name="image[]",
+                name="image",
                 content_type=mime or "image/png",
                 filename=f"image_{idx}.{ext}",
                 data=raw,
             )
             has_any_image = True
+            break
 
         if not has_any_image:
             return None, 400, "图片编辑失败：输入图片格式错误"
 
         try:
+            impersonate = (
+                provider_config.impersonate.strip()
+                if isinstance(provider_config.impersonate, str)
+                and provider_config.impersonate.strip()
+                else None
+            )
+            verify = (
+                provider_config.tls_verify
+                if isinstance(provider_config.tls_verify, bool)
+                else True
+            )
+            req_kwargs = {
+                "timeout": self.def_common_config.timeout,
+                "proxy": self.def_common_config.proxy,
+                "verify": verify,
+            }
+            if impersonate:
+                req_kwargs["impersonate"] = impersonate
             response = await self.session.post(
                 url=provider_config.api_url,
                 headers=headers,
                 data=form,
                 multipart=mp,
-                timeout=self.def_common_config.timeout,
-                proxy=self.def_common_config.proxy,
+                **req_kwargs,
             )
             result = response.json()
+            if (
+                response.status_code == 200
+                and isinstance(result, dict)
+                and isinstance(result.get("task_id"), str)
+                and result.get("task_id").strip()
+            ):
+                task_id = result.get("task_id").strip()
+                try:
+                    parsed = urlparse(provider_config.api_url)
+                    task_url = f"{parsed.scheme}://{parsed.netloc}/v1/task/{task_id}"
+                except Exception:
+                    task_url = ""
+                if not task_url:
+                    return None, 200, "图片编辑失败：无法解析任务查询地址"
+
+                started = time.time()
+                poll_kwargs = {
+                    "timeout": 30,
+                    "proxy": self.def_common_config.proxy,
+                    "verify": verify,
+                }
+                if impersonate:
+                    poll_kwargs["impersonate"] = impersonate
+
+                while True:
+                    if time.time() - started > 1800:
+                        return None, 408, "图片编辑失败：任务超时"
+
+                    task_resp = await self.session.get(
+                        task_url,
+                        headers=headers,
+                        **poll_kwargs,
+                    )
+                    try:
+                        task_json = task_resp.json()
+                    except Exception:
+                        task_json = None
+
+                    if not isinstance(task_json, dict):
+                        await asyncio.sleep(2)
+                        continue
+                    if task_json.get("error"):
+                        msg = (
+                            task_json.get("message")
+                            if isinstance(task_json.get("message"), str)
+                            else None
+                        )
+                        return None, 200, f"图片编辑失败：{msg or str(task_json.get('error'))}"
+                    status = task_json.get("status")
+                    if status == "success":
+                        output = task_json.get("output")
+                        if (
+                            isinstance(output, dict)
+                            and isinstance(output.get("file_url"), str)
+                            and output.get("file_url").strip()
+                        ):
+                            file_url = output.get("file_url").strip()
+                            b64_images = await self.downloader.fetch_images([file_url])
+                            b64_images = [(m, b) for m, b in b64_images if b]
+                            if not b64_images:
+                                return None, 200, "图片编辑失败：结果图片下载失败"
+                            return b64_images, 200, None
+                        return None, 200, "图片编辑失败：任务成功但未返回图片"
+                    if status in ("failed", "cancelled"):
+                        return None, 200, f"图片编辑失败：任务{status}"
+
+                    await asyncio.sleep(2)
             if response.status_code == 200:
                 b64_images: list[tuple[str, str]] = []
                 images_url: list[str] = []

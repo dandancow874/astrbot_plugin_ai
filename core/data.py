@@ -28,6 +28,10 @@ class ProviderConfig:
     """模型名称"""
     stream: bool = False
     """是否启用流式响应"""
+    tls_verify: bool | None = None
+    """是否验证 TLS 证书（None 表示使用默认行为）"""
+    impersonate: str | None = None
+    """curl_cffi 指纹伪装标识（None 表示不启用）"""
 
 
 @dataclass(repr=False, slots=True)
@@ -71,6 +75,10 @@ class CommonConfig:
     """ 是否在预设提示词后追加用户输入文本 """
     text_response: bool = False
     """是否启用文本响应"""
+    tls_verify: bool = True
+    """兼容旧配置：已废弃"""
+    impersonate: str = ""
+    """兼容旧配置：已废弃"""
     smart_retry: bool = True
     """是否启用智能重试"""
     max_retry: int = 3

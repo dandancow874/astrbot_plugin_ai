@@ -35,12 +35,29 @@ class GeminiProvider(BaseProvider):
             params,
         )
         try:
+            impersonate = (
+                provider_config.impersonate.strip()
+                if isinstance(provider_config.impersonate, str)
+                and provider_config.impersonate.strip()
+                else None
+            )
+            verify = (
+                provider_config.tls_verify
+                if isinstance(provider_config.tls_verify, bool)
+                else True
+            )
+            req_kwargs = {
+                "proxy": self.def_common_config.proxy,
+                "timeout": self.def_common_config.timeout,
+                "verify": verify,
+            }
+            if impersonate:
+                req_kwargs["impersonate"] = impersonate
             response = await self.session.post(
                 url,
                 headers=headers,
                 json=gemini_context,
-                proxy=self.def_common_config.proxy,
-                timeout=self.def_common_config.timeout,
+                **req_kwargs,
             )
             # 响应反序列化
             result = response.json()
@@ -111,13 +128,30 @@ class GeminiProvider(BaseProvider):
             model=params.get("model", provider_config.model), image_b64_list=image_b64_list, params=params
         )
         try:
+            impersonate = (
+                provider_config.impersonate.strip()
+                if isinstance(provider_config.impersonate, str)
+                and provider_config.impersonate.strip()
+                else None
+            )
+            verify = (
+                provider_config.tls_verify
+                if isinstance(provider_config.tls_verify, bool)
+                else True
+            )
+            req_kwargs = {
+                "proxy": self.def_common_config.proxy,
+                "timeout": self.def_common_config.timeout,
+                "verify": verify,
+            }
+            if impersonate:
+                req_kwargs["impersonate"] = impersonate
             response = await self.session.post(
                 url,
                 headers=headers,
                 json=gemini_context,
-                proxy=self.def_common_config.proxy,
-                timeout=self.def_common_config.timeout,
                 stream=True,
+                **req_kwargs,
             )
             # 处理流式响应
             streams = response.aiter_content(chunk_size=1024)

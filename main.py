@@ -1,5 +1,6 @@
 import asyncio
 import itertools
+import json
 import os
 
 import astrbot.api.message_components as Comp
@@ -162,7 +163,7 @@ class BigBanana(Star):
         if not bool(itp_conf.get("enabled", True)):
             return "❌ Image-to-Prompt 未启用"
 
-        model = str(itp_conf.get("model", "") or "").strip() or "gpt-4o-mini"
+        model = str(itp_conf.get("model", "") or "").strip()
         system_prompt = str(itp_conf.get("system_prompt", "") or "").strip()
 
         primary_conf = itp_conf.get("primary", {})
@@ -171,6 +172,8 @@ class BigBanana(Star):
 
         api_url = primary_conf.get("api_url", itp_conf.get("api_url", ""))
         api_key_raw = primary_conf.get("api_key", itp_conf.get("api_key", ""))
+        tls_verify = primary_conf.get("tls_verify", itp_conf.get("tls_verify", True))
+        impersonate = primary_conf.get("impersonate", itp_conf.get("impersonate", ""))
         api_url = self._normalize_api_url("OpenAI_Chat", str(api_url or ""))
         keys = self._parse_keys(api_key_raw)
 
@@ -202,21 +205,35 @@ class BigBanana(Star):
             }
         )
 
-        body = {"model": model, "messages": messages, "stream": False, "max_tokens": 1024}
+        body = {"messages": messages, "stream": False, "max_tokens": 1024}
+        if model:
+            body["model"] = model
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {keys[0]}",
         }
 
         try:
+            req_kwargs = {
+                "timeout": self.common_config.timeout,
+                "proxy": self.common_config.proxy,
+                "verify": bool(tls_verify),
+            }
+            if isinstance(impersonate, str) and impersonate.strip():
+                req_kwargs["impersonate"] = impersonate.strip()
             response = await self.http_manager._get_curl_session().post(
                 url=api_url,
                 headers=headers,
                 json=body,
-                timeout=self.common_config.timeout,
-                proxy=self.common_config.proxy,
+                **req_kwargs,
             )
-            result = response.json()
+            try:
+                result = response.json()
+            except json.JSONDecodeError as e:
+                logger.error(
+                    f"[BIG BANANA] Image-to-Prompt JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{response.text[:1024]}"
+                )
+                return "❌ 反推失败：响应内容格式错误"
             if response.status_code != 200:
                 msg = None
                 if isinstance(result, dict):
@@ -385,6 +402,11 @@ class BigBanana(Star):
                     primary_conf = {}
 
                 def build_provider_item(conf: dict, suffix: str) -> dict:
+                    api_base_mapping = {
+                        "t8star": "https://ai.t8star.cn",
+                        "hk": "https://hk-api.gptbest.vip",
+                        "us": "https://api.gptbest.vip",
+                    }
                     api_type = conf.get("api_type", None)
                     if not isinstance(api_type, str) or not api_type.strip():
                         api_type = default_provider_stub.get("api_type")
@@ -398,7 +420,23 @@ class BigBanana(Star):
                         item["model"] = model_name.strip()
 
                     url = conf.get("api_url", model_conf.get("api_url", ""))
+                    api_base = conf.get("api_base", None)
+                    if isinstance(api_base, str) and api_base.strip():
+                        api_base = api_base.strip()
+                        if api_base == "ip":
+                            custom_ip = conf.get("custom_ip", None)
+                            if isinstance(custom_ip, str) and custom_ip.strip():
+                                url = custom_ip.strip()
+                        elif api_base in api_base_mapping:
+                            url = api_base_mapping[api_base]
                     item["api_url"] = url
+
+                    tls_verify = conf.get("tls_verify", None)
+                    if isinstance(tls_verify, bool):
+                        item["tls_verify"] = tls_verify
+                    impersonate = conf.get("impersonate", None)
+                    if isinstance(impersonate, str) and impersonate.strip():
+                        item["impersonate"] = impersonate.strip()
 
                     if (
                         item.get("api_type") == "OpenAI_Chat"
@@ -482,7 +520,7 @@ class BigBanana(Star):
                 "enabled": True,
                 "api_type": "Gemini",
                 "keys": [],
-                "api_url": DEF_GEMINI_API_URL,
+                "api_url": "https://ai.t8star.cn",
                 "model": "gemini-3-pro-image-preview",
                 "stream": False,
             },

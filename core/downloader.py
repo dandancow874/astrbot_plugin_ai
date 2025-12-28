@@ -63,11 +63,15 @@ class Downloader:
 
     async def _download_image(self, url: str) -> tuple[str, str] | None:
         try:
-            response = await self.session.get(url, impersonate="chrome131", proxy=self.def_common_config.proxy, timeout=30)
+            response = await self.session.get(
+                url,
+                impersonate="chrome131",
+                proxy=self.def_common_config.proxy,
+                timeout=30,
+            )
             content = self._handle_image(response.content)
             return content
         except (SSLError, CertificateVerifyError):
-            # 关闭SSL验证
             response = await self.session.get(
                 url, impersonate="chrome131", timeout=30, verify=False
             )

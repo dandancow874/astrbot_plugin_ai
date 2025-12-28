@@ -27,6 +27,19 @@
                 "description": "主提供商",
                 "type": "object",
                 "items": {
+                    "api_base": {
+                        "description": "API Base 预设",
+                        "type": "string",
+                        "options": ["t8star", "ip", "hk", "us"],
+                        "default": "t8star",
+                        "hint": "t8star=ai.t8star.cn；ip=自定义；hk/us 为历史站点（若不可用请改用 t8star 或自定义）。"
+                    },
+                    "custom_ip": {
+                        "description": "自定义 Base URL",
+                        "type": "string",
+                        "default": "",
+                        "hint": "当 api_base=ip 时填写，例如 https://ai.t8star.cn。"
+                    },
                     "api_type": {
                         "description": "接口类型",
                         "type": "string",
@@ -37,8 +50,8 @@
                     "api_url": {
                         "description": "Gemini URL",
                         "type": "string",
-                        "default": "https://generativelanguage.googleapis.com/v1beta/models",
-                        "hint": "可填完整 models URL，或仅填 Base URL（逆向 API），例如 https://ai.t8star.cn。仅填 Base URL 时会自动补全 /v1beta/models。"
+                        "default": "https://ai.t8star.cn",
+                        "hint": "推荐填 Base URL，例如 https://ai.t8star.cn。仅填 Base URL 时会自动补全 /v1beta/models。也可填完整 models URL。"
                     },
                     "api_key": {
                         "description": "Gemini API Key",
@@ -51,6 +64,16 @@
                         "type": "string",
                         "default": "gemini-3-pro-image-preview",
                         "hint": "Gemini/Vertex 共用模型名。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
                     }
                 }
             },
@@ -58,6 +81,17 @@
                 "description": "备用提供商",
                 "type": "object",
                 "items": {
+                    "api_base": {
+                        "description": "API Base 预设",
+                        "type": "string",
+                        "options": ["t8star", "ip", "hk", "us"],
+                        "default": "t8star"
+                    },
+                    "custom_ip": {
+                        "description": "自定义 Base URL",
+                        "type": "string",
+                        "default": ""
+                    },
                     "api_type": {
                         "description": "接口类型",
                         "type": "string",
@@ -69,7 +103,7 @@
                         "description": "Gemini URL",
                         "type": "string",
                         "default": "",
-                        "hint": "留空表示不启用备用。可填完整 models URL，或仅填 Base URL（逆向 API），例如 https://ai.t8star.cn。仅填 Base URL 时会自动补全 /v1beta/models。"
+                        "hint": "留空表示不启用备用。推荐填 Base URL，例如 https://ai.t8star.cn。仅填 Base URL 时会自动补全 /v1beta/models。"
                     },
                     "api_key": {
                         "description": "Gemini API Key",
@@ -82,6 +116,16 @@
                         "type": "string",
                         "default": "",
                         "hint": "留空使用默认模型名。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
                     }
                 }
             }
@@ -112,6 +156,18 @@
                         "type": "string",
                         "default": "",
                         "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true,
+                        "hint": "仅影响此模型的接口请求。关闭后将绕过 TLS 验证（有安全风险）。"
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131",
+                        "hint": "仅影响此模型的接口请求。用于部分逆向/反代站点的 TLS 指纹校验。"
                     }
                 }
             },
@@ -129,6 +185,16 @@
                         "type": "string",
                         "default": "",
                         "hint": "留空表示不启用备用。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
                     }
                 }
             }
@@ -151,8 +217,8 @@
                     "api_url": {
                         "description": "OpenAI兼容 URL",
                         "type": "string",
-                        "default": "https://api.openai.com/v1",
-                        "hint": "可填 Base URL（会自动补全为 /v1/chat/completions 或 /v1/images/generations）。若使用图片编辑接口（如 https://ai.gitee.com/v1/async/images/edits），请直接填完整地址。"
+                        "default": "https://ai.gitee.com/v1/async/images/edits",
+                        "hint": "推荐直接填完整 edits 地址（例如 https://ai.gitee.com/v1/async/images/edits）。如果填 Base URL，会自动补全为 /v1/chat/completions 或 /v1/images/generations。"
                     },
                     "api_key": {
                         "description": "API Key",
@@ -194,8 +260,8 @@
             "model": {
                 "description": "模型名称",
                 "type": "string",
-                "default": "gpt-4o-mini",
-                "hint": "OpenAI 兼容模型名称。"
+                "default": "",
+                "hint": "可留空（让接口使用默认模型）。如果接口提示 Model does not exist，请在这里填对方支持的模型名。"
             },
             "system_prompt": {
                 "description": "系统提示词",
@@ -218,6 +284,16 @@
                         "type": "string",
                         "default": "",
                         "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
                     }
                 }
             }
@@ -285,6 +361,18 @@
                         "description": "启用流式传输",
                         "type": "bool",
                         "default": false
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true,
+                        "hint": "关闭后将绕过 TLS 验证（有安全风险）。"
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "",
+                        "hint": "用于部分逆向/反代站点的 TLS 指纹校验。例如 chrome131。留空表示不启用。"
                     }
                 }
             }
