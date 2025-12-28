@@ -1,0 +1,536 @@
+{
+    "prompt": {
+        "description": "预设提示词",
+        "type": "list",
+        "default": [
+            "bnn {{user_text}} --min_images 1 --image_size 2K",
+            "bnt {{user_text}} --min_images 0 --image_size 2K",
+            "bna {{user_text}} --min_images 0 --gather_mode --image_size 2K",
+            "zimg {{user_text}} --min_images 0 --image_size 2K",
+            "edit {{user_text}} --min_images 1",
+            "反推 详细描述这张图片 --min_images 1"
+            
+        ],
+        "hint": "格式1: 触发词 提示词 --参数1 参数值1 --参数2 参数值2。格式2: [触发词1,触发词2] 提示词 --参数1 参数值1 --参数2 参数值2。触发词和触发词列表不能有空格。若省略参数值，则视为布尔值true。占位提示词：{{user_text}}，占位提示词会被消息内容覆盖，用于自定义提示词，可以在占位提示词前后添加固定的预设提示词。可选的参数请参考 README.md。触发词冲突可能会相互覆盖。"
+    },
+    "nanobanana_config": {
+        "description": "🍌 nano-banana 模型配置",
+        "type": "object",
+        "hint": "bnn / bnt / bna 会使用这里配置的 URL 与 API Key。",
+        "items": {
+            "enabled": {
+                "description": "启用",
+                "type": "bool",
+                "default": true
+            },
+            "primary": {
+                "description": "主提供商",
+                "type": "object",
+                "items": {
+                    "api_type": {
+                        "description": "接口类型",
+                        "type": "string",
+                        "options": ["Gemini", "Vertex_AI_Anonymous"],
+                        "default": "Gemini",
+                        "hint": "Vertex_AI_Anonymous 不需要 Key。"
+                    },
+                    "api_url": {
+                        "description": "Gemini URL",
+                        "type": "string",
+                        "default": "https://generativelanguage.googleapis.com/v1beta/models",
+                        "hint": "可填完整 models URL，或仅填 Base URL（逆向 API），例如 https://ai.t8star.cn。仅填 Base URL 时会自动补全 /v1beta/models。"
+                    },
+                    "api_key": {
+                        "description": "Gemini API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                    },
+                    "model": {
+                        "description": "模型名称",
+                        "type": "string",
+                        "default": "gemini-3-pro-image-preview",
+                        "hint": "Gemini/Vertex 共用模型名。"
+                    }
+                }
+            },
+            "secondary": {
+                "description": "备用提供商",
+                "type": "object",
+                "items": {
+                    "api_type": {
+                        "description": "接口类型",
+                        "type": "string",
+                        "options": ["Gemini", "Vertex_AI_Anonymous"],
+                        "default": "Gemini",
+                        "hint": "留空表示不启用备用。Vertex_AI_Anonymous 不需要 Key。"
+                    },
+                    "api_url": {
+                        "description": "Gemini URL",
+                        "type": "string",
+                        "default": "",
+                        "hint": "留空表示不启用备用。可填完整 models URL，或仅填 Base URL（逆向 API），例如 https://ai.t8star.cn。仅填 Base URL 时会自动补全 /v1beta/models。"
+                    },
+                    "api_key": {
+                        "description": "Gemini API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "留空表示不启用备用。"
+                    },
+                    "model": {
+                        "description": "模型名称",
+                        "type": "string",
+                        "default": "",
+                        "hint": "留空使用默认模型名。"
+                    }
+                }
+            }
+        }
+    },
+    "zimage_config": {
+        "description": "🧩 Z-Image-Turbo 模型配置",
+        "type": "object",
+        "hint": "zimg 会使用这里配置的 URL 与 API Key。",
+        "items": {
+            "enabled": {
+                "description": "启用",
+                "type": "bool",
+                "default": true
+            },
+            "primary": {
+                "description": "主提供商",
+                "type": "object",
+                "items": {
+                    "api_url": {
+                        "description": "OpenAI兼容 URL",
+                        "type": "string",
+                        "default": "https://api.openai.com/v1",
+                        "hint": "填 Base URL，例如 https://ai.gitee.com/v1。"
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                    }
+                }
+            },
+            "secondary": {
+                "description": "备用提供商",
+                "type": "object",
+                "items": {
+                    "api_url": {
+                        "description": "OpenAI兼容 URL",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "留空表示不启用备用。"
+                    }
+                }
+            }
+        }
+    },
+    "qwen_edit_2511_config": {
+        "description": "🧪 Qwen-Image-Edit-2511 模型配置",
+        "type": "object",
+        "hint": "edit 会使用这里配置的 URL 与 API Key。",
+        "items": {
+            "enabled": {
+                "description": "启用",
+                "type": "bool",
+                "default": true
+            },
+            "primary": {
+                "description": "主提供商",
+                "type": "object",
+                "items": {
+                    "api_url": {
+                        "description": "OpenAI兼容 URL",
+                        "type": "string",
+                        "default": "https://api.openai.com/v1",
+                        "hint": "可填 Base URL（会自动补全为 /v1/chat/completions 或 /v1/images/generations）。若使用图片编辑接口（如 https://ai.gitee.com/v1/async/images/edits），请直接填完整地址。"
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                    }
+                }
+            },
+            "secondary": {
+                "description": "备用提供商",
+                "type": "object",
+                "items": {
+                    "api_url": {
+                        "description": "OpenAI兼容 URL",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "留空表示不启用备用。"
+                    }
+                }
+            }
+        }
+    },
+    "Image-to-Prompt": {
+        "description": "🧪 Image-to-Prompt 模型配置",
+        "type": "object",
+        "hint": "反推 会使用这里配置的 URL 与 API Key。",
+        "items": {
+            "enabled": {
+                "description": "启用",
+                "type": "bool",
+                "default": true
+            },
+            "model": {
+                "description": "模型名称",
+                "type": "string",
+                "default": "gpt-4o-mini",
+                "hint": "OpenAI 兼容模型名称。"
+            },
+            "system_prompt": {
+                "description": "系统提示词",
+                "type": "string",
+                "default": "",
+                "hint": "可留空。会作为 system 消息发送。"
+            },
+            "primary": {
+                "description": "主提供商",
+                "type": "object",
+                "items": {
+                    "api_url": {
+                        "description": "OpenAI兼容 URL",
+                        "type": "string",
+                        "default": "https://api.openai.com/v1",
+                        "hint": "填 Base URL。"
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                    }
+                }
+            }
+
+        }
+        
+    },
+    "models": {
+        "description": "➕ 额外模型方案配置",
+        "type": "list",
+        "hint": "如果你还要添加更多模型方案，可在这里新增。nano-banana / Z-Image / Qwen-Edit 会优先使用上面的专用配置。",
+        "items": {
+            "name": {
+                "description": "方案名称",
+                "type": "string",
+                "default": "新模型方案"
+            },
+            "triggers": {
+                "description": "触发指令列表",
+                "type": "list",
+                "default": []
+            },
+            "enabled": {
+                "description": "启用此方案",
+                "type": "bool",
+                "default": true
+            },
+            "providers": {
+                "description": "🔌 AI账号/接口配置 (支持多账号重试)",
+                "type": "list",
+                "default": [],
+                "items": {
+                    "name": {
+                        "description": "账号备注",
+                        "type": "string",
+                        "default": "主账号"
+                    },
+                    "enabled": {
+                        "description": "启用此账号",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "api_type": {
+                        "description": "接口类型",
+                        "type": "string",
+                        "options": ["Gemini", "OpenAI_Chat", "OpenAI_Images", "Vertex_AI_Anonymous"],
+                        "default": "Gemini"
+                    },
+                    "keys": {
+                        "description": "API Key (密钥)",
+                        "type": "list",
+                        "default": []
+                    },
+                    "api_url": {
+                        "description": "API 地址 (URL)",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "model": {
+                        "description": "模型版本名称",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "stream": {
+                        "description": "启用流式传输",
+                        "type": "bool",
+                        "default": false
+                    }
+                }
+            }
+        },
+        "default": []
+    },
+    "prompt_config": {
+        "description": "提示词默认参数",
+        "type": "object",
+        "hint": "若提示词中未指定参数，将使用这里的默认参数。自定义提示词也可以直接指定参数，记得带上空格。示例：bnn 提示词 --image_size 4K --google_search",
+        "items": {
+            "min_images": {
+                "description": "最小输入图片数量",
+                "type": "int",
+                "default": 1,
+                "hint": "如果消息携带的图片数量少于这个值，将自动添加At对象头像（At多个用户则可能添加多张，直到达到上限），如果仍然不够，继续添加发送者头像（仅Aiocqhttp），数量仍然不够将返回错误信息。"
+            },
+            "max_images": {
+                "description": "最大输入图片数量",
+                "type": "int",
+                "default": 6,
+                "hint": "消息中携带的图片数量超过这个值n，只取前n张图片。Gemini API文档写了Gemini3最大支持14张图片输入，最佳实践是3张。"
+            },
+            "aspect_ratio": {
+                "description": "宽高比",
+                "type": "string",
+                "options": [
+                    "default",
+                    "1:1",
+                    "2:3",
+                    "3:2",
+                    "3:4",
+                    "4:3",
+                    "4:5",
+                    "5:4",
+                    "9:16",
+                    "16:9",
+                    "21:9"
+                ],
+                "default": "default",
+                "hint": "设置为 default 将不传递这个参数。根据Gemini API文档，默认情况下，模型会使输出图片的大小与输入图片的大小保持一致。仅Gemini规范有效。"
+            },
+            "image_size": {
+                "description": "分辨率",
+                "type": "string",
+                "options": [
+                    "1K",
+                    "2K",
+                    "4K"
+                ],
+                "default": "1K",
+                "hint": "生成图片的分辨率，必须是大写的K。当前仅对Gemini规范的 gemini-3 模型有效"
+            },
+            "google_search": {
+                "description": "是否启用谷歌搜索工具",
+                "type": "bool",
+                "default": true,
+                "hint": "允许模型使用谷歌搜索工具获取实时信息。当前仅对Gemini规范的 gemini-3 模型有效"
+            },
+            "refer_images": {
+                "description": "参考图片",
+                "type": "string",
+                "default": "",
+                "hint": "填写格式是 文件名1,文件名2 把图片文件放在插件数据目录的 refer_images 文件夹下，这个参数指定的图片会优先传递给上下文。"
+            },
+            "gather_mode": {
+                "description": "启用收集模式",
+                "type": "bool",
+                "default": false,
+                "hint": "启用后插件不会立即开始画图，允许用户连续发送多条消息，直到回复「开始」，才会将收集到的文本和图片用于图片生成。"
+            }
+        }
+    },
+    "common_config": {
+        "description": "常规配置",
+        "type": "object",
+        "hint": "",
+        "items": {
+            "preset_append": {
+                "description": "启用预设提示词补充",
+                "type": "bool",
+                "default": true,
+                "hint": "启用后将在预设提示词后追加用户输入文本。相当于给预设提示词末尾加上 {{user_text}} 占位符。若已有 {{user_text}} 占位符，则忽略。"
+            },
+            "text_response": {
+                "description": "启用文本响应",
+                "type": "bool",
+                "default": false,
+                "hint": "无论是否开启此项，插件都会静默忽略文本响应。仅Gemini规范有效。"
+            },
+            "smart_retry": {
+                "description": "启用智能重试",
+                "type": "bool",
+                "default": true,
+                "hint": "启用后针对部分响应代码跳过重试，直接切换下一个Key。"
+            },
+            "max_retry": {
+                "description": "最大重试次数",
+                "type": "int",
+                "default": 3,
+                "hint": "每个Key的最大重试次数"
+            },
+            "timeout": {
+                "description": "超时",
+                "type": "float",
+                "default": 300,
+                "hint": "单位：秒，仅对模型请求有效。每次重试独立计算超时时间。"
+            },
+            "proxy": {
+                "description": "HTTP代理",
+                "type": "string",
+                "default": "",
+                "hint": "格式示例：http://127.0.0.1:7890，对大部分接口请求启用（包括图片下载）。"
+            }
+        }
+    },
+    "prefix_config": {
+        "description": "绘图命令触发方式",
+        "type": "object",
+        "hint": "默认情况下，@机器人 将无视前缀要求（相当于启用混合模式）",
+        "items": {
+            "coexist_enabled": {
+                "description": "混合模式",
+                "type": "bool",
+                "default": false,
+                "hint": "启用后，无命令前缀与带命令前缀皆可触发生成图片功能。无特殊需求不需要开启。"
+            },
+            "prefix_list": {
+                "description": "命令前缀",
+                "type": "list",
+                "default": [],
+                "hint": "命令前缀列表。触发格式是 命令前缀+触发词。"
+            }
+        }
+    },
+    "vertex_ai_anonymous_config": {
+        "description": "Vertex AI Anonymous配置项",
+        "type": "object",
+        "hint": "提供商配置中，除了接口规范和模型外，其他选项皆对Vertex AI Anonymous规范无效，请在此配置。",
+        "items": {
+            "recaptcha_base_api": {
+                "description": "Recaptcha Base API",
+                "type": "string",
+                "default": "https://www.google.com",
+                "hint": "考虑到网络环境或者IP频繁的情况，可以在这里配置反向代理"
+            },
+            "vertex_ai_anonymous_base_api": {
+                "description": "Vertex AI Anonymous Base API",
+                "type": "string",
+                "default": "https://cloudconsole-pa.clients6.google.com",
+                "hint": "考虑到网络环境或者IP频繁的情况，可以在这里配置反向代理"
+            },
+            "system_prompt": {
+                "description": "系统提示词",
+                "type": "text",
+                "default": "",
+                "hint": "留空将不传递这个参数。"
+            },
+            "max_retry": {
+                "description": "最大重试次数",
+                "type": "int",
+                "default": 10,
+                "hint": "独立于常规接口的重试次数配置。"
+            }
+        }
+    },
+    "preference_config": {
+        "description": "偏好设置",
+        "type": "object",
+        "hint": "以下配置因个人使用需求而异，暂无两全之策。跳过At头像的三个选项共用一个计数。",
+        "items": {
+            "skip_at_first": {
+                "description": "跳过第一次@机器人",
+                "type": "bool",
+                "default": true,
+                "hint": "通过@唤醒机器人时，跳过一次机器人的头像。"
+            },
+            "skip_quote_first": {
+                "description": "跳过第一次@引用",
+                "type": "bool",
+                "default": true,
+                "hint": "如果@对象是被引用消息的发送者，跳过一次@对象的头像。"
+            },
+            "skip_llm_at_first": {
+                "description": "LLM跳过第一次@机器人",
+                "type": "bool",
+                "default": true,
+                "hint": "通过@机器人触发LLM函数调用工具，跳过一次机器人的头像。"
+            }
+        }
+    },
+    "llm_tool_settings": {
+        "description": "LLM函数调用工具配置",
+        "type": "object",
+        "hint": "",
+        "items": {
+            "llm_tool_enabled": {
+                "description": "启用函数调用工具",
+                "type": "bool",
+                "default": true,
+                "hint": "通过LLM对话生成图片，建议在AstrBot面板的配置文件中调整「工具调用超时时间」，以适应图片生成需要"
+            }
+        }
+    },
+    "save_images": {
+        "description": "图片存储",
+        "type": "object",
+        "hint": "",
+        "items": {
+            "local_save": {
+                "description": "本地存储",
+                "type": "bool",
+                "default": false,
+                "hint": "生成的图片保存到插件数据目录的 save_images 文件夹"
+            }
+        }
+    },
+    "whitelist_config": {
+        "description": "白名单配置",
+        "type": "object",
+        "hint": "",
+        "items": {
+            "enabled": {
+                "description": "启用群组白名单",
+                "type": "bool",
+                "default": false,
+                "hint": "开启后，只有在白名单内的群组可以使用"
+            },
+            "whitelist": {
+                "description": "群组UMO白名单",
+                "type": "list",
+                "default": [],
+                "hint": "白名单群组UMO列表，可在对应群内使用/sid获取。要把UMO写完整。"
+            },
+            "user_enabled": {
+                "description": "启用用户白名单",
+                "type": "bool",
+                "default": false,
+                "hint": "开启后，只有在白名单内的用户可以使用"
+            },
+            "user_whitelist": {
+                "description": "用户ID白名单",
+                "type": "list",
+                "default": [],
+                "hint": "用户QQ号列表"
+            }
+        }
+    }
+}
