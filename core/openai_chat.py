@@ -87,6 +87,7 @@ class OpenAIChatProvider(BaseProvider):
         """
         headers = {
             "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
         }
         # 构建请求上下文
         openai_context = self._build_openai_chat_context(
@@ -191,6 +192,8 @@ class OpenAIChatProvider(BaseProvider):
         """
         headers = {
             "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
         }
         # 构建请求上下文
         openai_context = self._build_openai_chat_context(
@@ -211,25 +214,42 @@ class OpenAIChatProvider(BaseProvider):
             )
             req_kwargs = {
                 "proxy": self.def_common_config.proxy,
+                "timeout": self.def_common_config.timeout,
                 "verify": verify,
             }
             if impersonate:
                 req_kwargs["impersonate"] = impersonate
-            # 发送请求
-            response = await self.session.post(
-                url=provider_config.api_url,
-                headers=headers,
-                json=openai_context,
-                stream=True,
-                **req_kwargs,
-            )
-            # 处理流式响应
-            streams = response.aiter_content(chunk_size=1024)
-            # 读取完整内容
-            data = b""
-            async for chunk in streams:
-                data += chunk
-            result = data.decode("utf-8")
+            async def post_request(use_data: bool):
+                if use_data:
+                    payload = json.dumps(openai_context, ensure_ascii=False)
+                    return await self.session.post(
+                        url=provider_config.api_url,
+                        headers=headers,
+                        data=payload,
+                        stream=True,
+                        **req_kwargs,
+                    )
+                return await self.session.post(
+                    url=provider_config.api_url,
+                    headers=headers,
+                    json=openai_context,
+                    stream=True,
+                    **req_kwargs,
+                )
+
+            async def read_response_text(resp) -> str:
+                data = b""
+                async for chunk in resp.aiter_content(chunk_size=1024):
+                    data += chunk
+                return data.decode("utf-8", errors="replace")
+
+            response = await post_request(use_data=False)
+            result = await read_response_text(response)
+            if response.status_code == 422:
+                detail = self._extract_error_message(result)
+                if detail == "Field required":
+                    response = await post_request(use_data=True)
+                    result = await read_response_text(response)
             if response.status_code == 200:
                 reasoning_content = ""
                 content_buf_parts: list[str] = []
