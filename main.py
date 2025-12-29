@@ -568,6 +568,156 @@ class BigBanana(Star):
             },
             insert_index=2,
         )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api bt1 文生图 横屏",
+            default_triggers=["bt1"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "gemini-3.0-pro-image-landscape",
+                "stream": True,
+            },
+            insert_index=3,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api bt2 文生图 竖屏",
+            default_triggers=["bt2"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "gemini-3.0-pro-image-portrait",
+                "stream": True,
+            },
+            insert_index=4,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api bp1 图生图 横屏",
+            default_triggers=["bp1"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "gemini-3.0-pro-image-landscape",
+                "stream": True,
+            },
+            insert_index=5,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api bp2 图生图 竖屏",
+            default_triggers=["bp2"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "gemini-3.0-pro-image-portrait",
+                "stream": True,
+            },
+            insert_index=6,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api tv1 文生视频 横屏",
+            default_triggers=["tv1"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_1_t2v_fast_landscape",
+                "stream": True,
+            },
+            insert_index=7,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api tv2 文生视频 竖屏",
+            default_triggers=["tv2"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_1_t2v_fast_portrait",
+                "stream": True,
+            },
+            insert_index=8,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api iv1 首尾帧图生视频 横屏",
+            default_triggers=["iv1"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_1_i2v_s_fast_fl_landscape",
+                "stream": True,
+            },
+            insert_index=9,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api iv2 首尾帧图生视频 竖屏",
+            default_triggers=["iv2"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_1_i2v_s_fast_fl_portrait",
+                "stream": True,
+            },
+            insert_index=10,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api rv1 图生视频 横屏",
+            default_triggers=["rv1"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_0_r2v_fast_landscape",
+                "stream": True,
+            },
+            insert_index=11,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api rv2 图生视频 竖屏",
+            default_triggers=["rv2"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_0_r2v_fast_portrait",
+                "stream": True,
+            },
+            insert_index=12,
+        )
 
         if updated_models:
             self.conf["models"] = models_data
@@ -629,9 +779,34 @@ class BigBanana(Star):
         # 预设提示词列表
         self.prompt_list = self.conf.get("prompt", [])
         self.prompt_dict = {}
+        existing_cmds: set[str] = set()
         for item in self.prompt_list:
             cmd_list, params = self.parsing_prompt_params(item)
             for cmd in cmd_list:
+                existing_cmds.add(cmd)
+                self.prompt_dict[cmd] = params
+
+        fixed_prompts: dict[str, str] = {
+            "bt1": "bt1 {{user_text}} --min_images 0",
+            "bt2": "bt2 {{user_text}} --min_images 0",
+            "bp1": "bp1 {{user_text}} --min_images 1",
+            "bp2": "bp2 {{user_text}} --min_images 1",
+            "tv1": "tv1 {{user_text}} --min_images 0",
+            "tv2": "tv2 {{user_text}} --min_images 0",
+            "iv1": "iv1 {{user_text}} --min_images 1",
+            "iv2": "iv2 {{user_text}} --min_images 1",
+            "rv1": "rv1 {{user_text}} --min_images 1",
+            "rv2": "rv2 {{user_text}} --min_images 1",
+        }
+        updated_prompts = False
+        for trigger, prompt_line in fixed_prompts.items():
+            if trigger in existing_cmds:
+                continue
+            cmd_list, params = self.parsing_prompt_params(prompt_line)
+            self.prompt_list.append(prompt_line)
+            updated_prompts = True
+            for cmd in cmd_list:
+                existing_cmds.add(cmd)
                 self.prompt_dict[cmd] = params
 
         # 将模型触发词也加入到 prompt_dict 中，以便在 on_message 中能通过检查
@@ -649,6 +824,10 @@ class BigBanana(Star):
                         # 如果已存在，标记该提示词属于哪个模型（如果未指定）
                         if "__model_name__" not in self.prompt_dict[trigger]:
                             self.prompt_dict[trigger]["__model_name__"] = model.name
+
+        if updated_prompts:
+            self.conf["prompt"] = self.prompt_list
+            self.conf.save_config()
 
     def parsing_prompt_params(self, prompt: str) -> tuple[list[str], dict]:
         """解析提示词中的参数，若没有指定参数则使用默认值填充。必须是包括命令和参数的完整提示词"""
@@ -1412,28 +1591,6 @@ class BigBanana(Star):
             logger.info(f"用户 {event.get_sender_id()} 不在白名单内，跳过处理")
             return
 
-        nanobanana_model_name = self.prompt_dict.get(cmd, {}).get("__model_name__")
-        is_nanobanana = (
-            nanobanana_model_name == "nano-banana" or cmd in {"bnn", "bnt", "bna"}
-        )
-        if is_nanobanana:
-            if (
-                self.nanobanana_group_whitelist_enabled
-                and event.unified_msg_origin not in self.nanobanana_group_whitelist
-            ):
-                logger.info(
-                    f"群 {event.unified_msg_origin} 不在 nano-banana 白名单内，跳过处理"
-                )
-                return
-            if (
-                self.nanobanana_user_whitelist_enabled
-                and event.get_sender_id() not in self.nanobanana_user_whitelist
-            ):
-                logger.info(
-                    f"用户 {event.get_sender_id()} 不在 nano-banana 白名单内，跳过处理"
-                )
-                return
-
         # 获取提示词配置 (使用 .copy() 防止修改污染全局预设)
         params = self.prompt_dict.get(cmd, {}).copy()
         # 先从预设提示词参数字典字典中取出提示词
@@ -1483,6 +1640,29 @@ class BigBanana(Star):
         if not preset_name and "{{user_text}}" in preset_prompt:
             new_prompt = preset_prompt.replace("{{user_text}}", user_prompt)
             params["prompt"] = new_prompt
+
+        is_nanobanana = params.get("__model_name__") == "nano-banana" or cmd in {
+            "bnn",
+            "bnt",
+            "bna",
+        }
+        if is_nanobanana:
+            if (
+                self.nanobanana_group_whitelist_enabled
+                and event.unified_msg_origin not in self.nanobanana_group_whitelist
+            ):
+                logger.info(
+                    f"群 {event.unified_msg_origin} 不在 nano-banana 白名单内，跳过处理"
+                )
+                return
+            if (
+                self.nanobanana_user_whitelist_enabled
+                and event.get_sender_id() not in self.nanobanana_user_whitelist
+            ):
+                logger.info(
+                    f"用户 {event.get_sender_id()} 不在 nano-banana 白名单内，跳过处理"
+                )
+                return
 
         if cmd == "反推":
             min_required_images = params.get("min_images", self.prompt_config.min_images)
@@ -1585,6 +1765,7 @@ class BigBanana(Star):
         task = asyncio.create_task(self.job(event, params, image_urls=image_urls))
         task_id = event.message_obj.message_id
         self.running_tasks[task_id] = task
+        task_temp_dir = self.temp_dir / str(task_id)
 
         try:
             results, err_msg = await task
@@ -1598,7 +1779,8 @@ class BigBanana(Star):
                 return
 
             # 组装消息链
-            msg_chain = self.build_message_chain(event, results)
+            os.makedirs(task_temp_dir, exist_ok=True)
+            msg_chain = self.build_message_chain(event, results, task_temp_dir)
 
             yield event.chain_result(msg_chain)
         except asyncio.CancelledError:
@@ -1606,9 +1788,7 @@ class BigBanana(Star):
             return
         finally:
             self.running_tasks.pop(task_id, None)
-            # 目前只有 telegram 平台需要清理缓存
-            if event.platform_meta.name == "telegram":
-                clear_cache(self.temp_dir)
+            clear_cache(task_temp_dir)
 
     async def job(
         self,
@@ -1833,23 +2013,47 @@ class BigBanana(Star):
         return None, err
 
     def build_message_chain(
-        self, event: AstrMessageEvent, results: list[tuple[str, str]]
+        self,
+        event: AstrMessageEvent,
+        results: list[tuple[str, str]],
+        temp_dir=None,
     ) -> list[BaseMessageComponent]:
         """构建消息链"""
         msg_chain: list[BaseMessageComponent] = [
             Comp.Reply(id=event.message_obj.message_id)
         ]
-        # 对Telegram平台特殊处理，超过10MB的图片需要作为文件发送
-        if event.platform_meta.name == "telegram" and any(
-            (b64 and len(b64) > MAX_SIZE_B64_LEN) for _, b64 in results
-        ):
-            save_results = save_images(results, self.temp_dir)
+
+        if temp_dir is None:
+            temp_dir = self.temp_dir
+
+        image_items: list[tuple[str, str]] = []
+        file_items: list[tuple[str, str]] = []
+
+        telegram_force_file = event.platform_meta.name == "telegram" and any(
+            (mime or "").startswith("image/") and b64 and len(b64) > MAX_SIZE_B64_LEN
+            for mime, b64 in results
+        )
+
+        for mime, b64 in results:
+            mime = (mime or "").strip()
+            if not b64:
+                continue
+            if telegram_force_file:
+                file_items.append((mime or "application/octet-stream", b64))
+                continue
+            if mime.startswith("image/"):
+                image_items.append((mime, b64))
+            else:
+                file_items.append((mime or "application/octet-stream", b64))
+
+        if file_items:
+            save_results = save_images(file_items, temp_dir)
             for name_, path_ in save_results:
                 msg_chain.append(Comp.File(name=name_, file=str(path_)))
-            return msg_chain
 
-        # 其他平台直接发送图片
-        msg_chain.extend(Comp.Image.fromBase64(b64) for _, b64 in results)
+        if image_items:
+            msg_chain.extend(Comp.Image.fromBase64(b64) for _, b64 in image_items)
+
         return msg_chain
 
     async def terminate(self):

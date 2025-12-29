@@ -19,6 +19,41 @@ class OpenAIChatProvider(BaseProvider):
 
     api_type: str = "OpenAI_Chat"
 
+    def _extract_media_sources(
+        self, content: str
+    ) -> tuple[list[tuple[str, str]], list[str]]:
+        b64_items: list[tuple[str, str]] = []
+        urls: list[str] = []
+
+        if not isinstance(content, str) or not content.strip():
+            return b64_items, urls
+
+        candidates: list[str] = []
+        candidates.extend(re.findall(r"!\[[^\]]*?\]\((.*?)\)", content))
+        candidates.extend(re.findall(r"\[[^\]]*?\]\((https?://.*?)\)", content))
+        candidates.extend(re.findall(r"(https?://[^\s\)\]]+)", content))
+
+        for raw in candidates:
+            src = (raw or "").strip().strip("<>").strip()
+            src = src.rstrip(").,;\"'")
+            if not src:
+                continue
+            if src.startswith("data:"):
+                try:
+                    header, base64_data = src.split(",", 1)
+                    mime = header.split(";")[0].replace("data:", "").strip()
+                    if mime:
+                        b64_items.append((mime, base64_data))
+                except Exception:
+                    continue
+                continue
+            parsed = urlparse(src)
+            if parsed.scheme in {"http", "https"}:
+                urls.append(src)
+
+        urls = list(dict.fromkeys(urls))
+        return b64_items, urls
+
     async def _call_api(
         self,
         provider_config: ProviderConfig,
@@ -37,6 +72,7 @@ class OpenAIChatProvider(BaseProvider):
         openai_context = self._build_openai_chat_context(
             params.get("model", provider_config.model), image_b64_list, params
         )
+        openai_context["stream"] = False
         try:
             impersonate = (
                 provider_config.impersonate.strip()
@@ -66,37 +102,34 @@ class OpenAIChatProvider(BaseProvider):
             # 响应反序列化
             result = response.json()
             if response.status_code == 200:
-                b64_images = []
-                images_url = []
+                b64_images: list[tuple[str, str]] = []
+                media_urls: list[str] = []
                 for item in result.get("choices", []):
                     # 检查 finish_reason 状态
                     finish_reason = item.get("finish_reason", "")
                     if finish_reason == "stop":
                         content = item.get("message", {}).get("content", "")
-                        match = re.search(r"!\[.*?\]\((.*?)\)", content)
-                        if match:
-                            img_src = match.group(1)
-                            if img_src.startswith("data:image/"):  # base64
-                                header, base64_data = img_src.split(",", 1)
-                                mime = header.split(";")[0].replace("data:", "")
-                                b64_images.append((mime, base64_data))
-                            else:  # URL
-                                images_url.append(img_src)
+                        b64_part, url_part = self._extract_media_sources(content)
+                        if b64_part:
+                            b64_images.extend(b64_part)
+                        if url_part:
+                            media_urls.extend(url_part)
                     else:
                         logger.warning(
                             f"[BIG BANANA] 图片生成失败, 响应内容: {response.text[:1024]}"
                         )
                         return None, 200, f"图片生成失败: {finish_reason}"
                 # 最后再检查是否有图片数据
-                if not images_url and not b64_images:
+                if not media_urls and not b64_images:
                     logger.warning(
                         f"[BIG BANANA] 请求成功，但未返回图片数据, 响应内容: {response.text[:1024]}"
                     )
                     return None, 200, "响应中未包含图片数据"
-                # 下载图片并转换为 base64
-                b64_images += await self.downloader.fetch_images(images_url)
+                # 下载媒体并转换为 base64
+                if media_urls:
+                    b64_images += await self.downloader.fetch_media(media_urls)
                 if not b64_images:
-                    return None, 200, "图片下载失败"
+                    return None, 200, "媒体下载失败"
                 return b64_images, 200, None
             else:
                 logger.error(
@@ -144,6 +177,7 @@ class OpenAIChatProvider(BaseProvider):
         openai_context = self._build_openai_chat_context(
             params.get("model", provider_config.model), image_b64_list, params
         )
+        openai_context["stream"] = True
         try:
             impersonate = (
                 provider_config.impersonate.strip()
@@ -178,9 +212,8 @@ class OpenAIChatProvider(BaseProvider):
                 data += chunk
             result = data.decode("utf-8")
             if response.status_code == 200:
-                b64_images = []
-                images_url = []
                 reasoning_content = ""
+                content_buf_parts: list[str] = []
                 for line in result.splitlines():
                     if line.startswith("data: "):
                         line_data = line[len("data: ") :].strip()
@@ -191,30 +224,22 @@ class OpenAIChatProvider(BaseProvider):
                             # 遍历 json_data，检查是否有图片
                             for item in json_data.get("choices", []):
                                 content = item.get("delta", {}).get("content", "")
-                                match = re.search(r"!\[.*?\]\((.*?)\)", content)
-                                if match:
-                                    img_src = match.group(1)
-                                    if img_src.startswith("data:image/"):  # base64
-                                        header, base64_data = img_src.split(",", 1)
-                                        mime = header.split(";")[0].replace("data:", "")
-                                        b64_images.append((mime, base64_data))
-                                    else:  # URL
-                                        images_url.append(img_src)
-                                else:  # 尝试查找失败的原因或者纯文本返回结果
-                                    reasoning_content += item.get("delta", {}).get(
-                                        "reasoning_content", ""
-                                    )
+                                if isinstance(content, str) and content:
+                                    content_buf_parts.append(content)
+                                rc = item.get("delta", {}).get("reasoning_content", "")
+                                if isinstance(rc, str) and rc:
+                                    reasoning_content += rc
                         except json.JSONDecodeError:
                             continue
-                if not images_url and not b64_images:
+                full_content = "".join(content_buf_parts)
+                b64_images, media_urls = self._extract_media_sources(full_content)
+                if media_urls:
+                    b64_images += await self.downloader.fetch_media(media_urls)
+                if not b64_images:
                     logger.warning(
                         f"[BIG BANANA] 请求成功，但未返回图片数据, 响应内容: {result[:1024]}"
                     )
                     return None, 200, reasoning_content or "响应中未包含图片数据"
-                # 下载图片并转换为 base64（有时会出现连接被重置的错误，不知道什么原因，国外服务器也一样）
-                b64_images += await self.downloader.fetch_images(images_url)
-                if not b64_images:
-                    return None, 200, "图片下载失败"
                 return b64_images, 200, None
             else:
                 logger.error(

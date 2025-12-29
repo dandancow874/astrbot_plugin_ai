@@ -13,6 +13,89 @@
         ],
         "hint": "格式1: 触发词 提示词 --参数1 参数值1 --参数2 参数值2。格式2: [触发词1,触发词2] 提示词 --参数1 参数值1 --参数2 参数值2。触发词和触发词列表不能有空格。若省略参数值，则视为布尔值true。占位提示词：{{user_text}}，占位提示词会被消息内容覆盖，用于自定义提示词，可以在占位提示词前后添加固定的预设提示词。可选的参数请参考 README.md。触发词冲突可能会相互覆盖。"
     },
+    "flow2api_config": {
+        "description": "🔌 flow2api 提供商配置",
+        "type": "object",
+        "hint": "bt1/bt2/bp1/bp2/tv1/tv2/iv1/iv2/rv1/rv2 会使用这里配置的 URL 与 API Key。",
+        "items": {
+            "enabled": {
+                "description": "启用",
+                "type": "bool",
+                "default": true
+            },
+            "primary": {
+                "description": "主提供商",
+                "type": "object",
+                "items": {
+                    "api_type": {
+                        "description": "接口类型",
+                        "type": "string",
+                        "options": ["OpenAI_Chat"],
+                        "default": "OpenAI_Chat"
+                    },
+                    "api_url": {
+                        "description": "OpenAI兼容 URL",
+                        "type": "string",
+                        "default": "http://192.168.2.109:8300/v1/chat/completions",
+                        "hint": "推荐直接填完整 chat/completions 地址。"
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "han1234",
+                        "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
+                    }
+                }
+            },
+            "secondary": {
+                "description": "备用提供商",
+                "type": "object",
+                "items": {
+                    "api_type": {
+                        "description": "接口类型",
+                        "type": "string",
+                        "options": ["OpenAI_Chat"],
+                        "default": "OpenAI_Chat",
+                        "hint": "留空表示不启用备用。"
+                    },
+                    "api_url": {
+                        "description": "OpenAI兼容 URL",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "留空表示不启用备用。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
+                    }
+                }
+            }
+        }
+    },
+
+
+
     "nanobanana_config": {
         "description": "🍌 nano-banana 模型配置",
         "type": "object",
@@ -26,7 +109,7 @@
             "whitelist": {
                 "description": "nano-banana 白名单配置",
                 "type": "object",
-                "hint": "仅对 bnn / bnt / bna 生效。",
+                "hint": "对最终使用 nano-banana 的请求生效（包括通过预设/--preset 间接调用）。",
                 "items": {
                     "enabled": {
                         "description": "启用群组白名单",
@@ -278,6 +361,7 @@
             }
         }
     },
+
     "Image-to-Prompt": {
         "description": "🧪 Image-to-Prompt 模型配置",
         "type": "object",

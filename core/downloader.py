@@ -1,4 +1,5 @@
 import base64
+import mimetypes
 from io import BytesIO
 
 from curl_cffi import AsyncSession
@@ -38,6 +39,16 @@ class Downloader:
                     image_b64_list.append(content)
                     break  # 成功就跳出重试
         return image_b64_list
+
+    async def fetch_media(self, urls: list[str]) -> list[tuple[str, str]]:
+        media_b64_list: list[tuple[str, str]] = []
+        for url in urls:
+            for _ in range(3):
+                content = await self._download_media(url)
+                if content is not None:
+                    media_b64_list.append(content)
+                    break
+        return media_b64_list
 
     def _handle_image(self, image_bytes: bytes) -> tuple[str, str]:
         try:
@@ -83,3 +94,46 @@ class Downloader:
         except Exception as e:
             logger.error(f"[BIG BANANA] 下载图片失败: {url}，错误信息：{e}")
             return None
+
+    async def _download_media(self, url: str) -> tuple[str, str] | None:
+        try:
+            response = await self.session.get(
+                url,
+                impersonate="chrome131",
+                proxy=self.def_common_config.proxy,
+                timeout=30,
+            )
+        except (SSLError, CertificateVerifyError):
+            response = await self.session.get(
+                url,
+                impersonate="chrome131",
+                timeout=30,
+                proxy=self.def_common_config.proxy,
+                verify=False,
+            )
+        except Timeout as e:
+            logger.error(f"[BIG BANANA] 网络请求超时: {url}，错误信息：{e}")
+            return None
+        except Exception as e:
+            logger.error(f"[BIG BANANA] 下载媒体失败: {url}，错误信息：{e}")
+            return None
+
+        mime = None
+        try:
+            headers = getattr(response, "headers", None)
+            if headers:
+                mime = headers.get("Content-Type") or headers.get("content-type")
+        except Exception:
+            mime = None
+        if isinstance(mime, str) and ";" in mime:
+            mime = mime.split(";", 1)[0].strip()
+        if not isinstance(mime, str) or not mime.strip():
+            guessed, _ = mimetypes.guess_type(url)
+            mime = guessed or "application/octet-stream"
+
+        if isinstance(mime, str) and mime.startswith("image/"):
+            handled = self._handle_image(response.content)
+            return handled
+
+        b64 = base64.b64encode(response.content).decode("utf-8")
+        return (mime, b64)
