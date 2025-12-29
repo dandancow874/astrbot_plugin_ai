@@ -5,6 +5,7 @@ import asyncio
 import time
 from urllib.parse import urlparse
 
+from aiohttp import ClientTimeout
 from curl_cffi import CurlMime
 from curl_cffi.requests.exceptions import Timeout
 
@@ -201,6 +202,72 @@ class OpenAIChatProvider(BaseProvider):
         )
         openai_context["stream"] = True
         try:
+            use_aiohttp = (
+                self.aiohttp_session is not None
+                and isinstance(provider_config.api_url, str)
+                and "/v1/chat/completions" in provider_config.api_url
+                and provider_config.stream
+            )
+            if use_aiohttp:
+                timeout = ClientTimeout(total=float(self.def_common_config.timeout))
+                proxy = (
+                    self.def_common_config.proxy
+                    if isinstance(self.def_common_config.proxy, str)
+                    and self.def_common_config.proxy.strip()
+                    else None
+                )
+                ssl = None
+                if provider_config.tls_verify is False:
+                    ssl = False
+                async with self.aiohttp_session.post(
+                    provider_config.api_url,
+                    headers=headers,
+                    json=openai_context,
+                    timeout=timeout,
+                    proxy=proxy,
+                    ssl=ssl,
+                ) as resp:
+                    result = await resp.text()
+                    if resp.status == 200:
+                        reasoning_content = ""
+                        content_buf_parts: list[str] = []
+                        for line in result.splitlines():
+                            if line.startswith("data: "):
+                                line_data = line[len("data: ") :].strip()
+                                if line_data == "[DONE]":
+                                    break
+                                try:
+                                    json_data = json.loads(line_data)
+                                    for item in json_data.get("choices", []):
+                                        content = item.get("delta", {}).get("content", "")
+                                        if isinstance(content, str) and content:
+                                            content_buf_parts.append(content)
+                                        rc = item.get("delta", {}).get("reasoning_content", "")
+                                        if isinstance(rc, str) and rc:
+                                            reasoning_content += rc
+                                except json.JSONDecodeError:
+                                    continue
+                        full_content = "".join(content_buf_parts)
+                        b64_images, media_urls = self._extract_media_sources(full_content)
+                        if media_urls:
+                            b64_images += await self.downloader.fetch_media(media_urls)
+                        if not b64_images:
+                            logger.warning(
+                                f"[BIG BANANA] 请求成功，但未返回图片数据, 响应内容: {result[:1024]}"
+                            )
+                            return None, 200, reasoning_content or "响应中未包含图片数据"
+                        return b64_images, 200, None
+                    logger.error(
+                        f"[BIG BANANA] 图片生成失败，状态码: {resp.status}, 响应内容: {result[:1024]}"
+                    )
+                    detail = self._extract_error_message(result)
+                    return (
+                        None,
+                        int(resp.status),
+                        f"图片生成失败: {detail}"
+                        if detail
+                        else f"图片生成失败: 状态码 {resp.status}",
+                    )
             impersonate = (
                 provider_config.impersonate.strip()
                 if isinstance(provider_config.impersonate, str)

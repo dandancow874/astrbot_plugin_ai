@@ -772,6 +772,7 @@ class BigBanana(Star):
                 prompt_config=self.prompt_config,
                 session=self.http_manager._get_curl_session(),
                 downloader=self.downloader,
+                aiohttp_session=self.http_manager._get_aiohttp_session(),
             )
 
     def init_prompts(self):

@@ -2,6 +2,7 @@ import random
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
+from aiohttp import ClientSession
 from curl_cffi import AsyncSession
 
 from astrbot.api import logger
@@ -22,6 +23,7 @@ class BaseProvider(ABC):
     """提供商类注册表"""
 
     session: AsyncSession
+    aiohttp_session: ClientSession | None
     def_common_config: CommonConfig
     def_prompt_config: PromptConfig
     downloader: Downloader
@@ -38,12 +40,14 @@ class BaseProvider(ABC):
         prompt_config: PromptConfig,
         session: AsyncSession,
         downloader: Downloader,
+        aiohttp_session: ClientSession | None = None,
     ):
         self.conf = config
         self.def_prompt_config = prompt_config
         self.def_common_config = common_config
         self.session = session
         self.downloader = downloader
+        self.aiohttp_session = aiohttp_session
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
