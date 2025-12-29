@@ -1598,6 +1598,7 @@ class BigBanana(Star):
         preset_prompt = params.get("prompt", "{{user_text}}")
 
         _, user_params = self.parsing_prompt_params(message_str)
+        user_overrode_min_images = "min_images" in user_params
         preset_name = user_params.pop("preset", None)
         user_prompt = user_params.get("prompt", "anything").strip()
 
@@ -1641,6 +1642,9 @@ class BigBanana(Star):
         if not preset_name and "{{user_text}}" in preset_prompt:
             new_prompt = preset_prompt.replace("{{user_text}}", user_prompt)
             params["prompt"] = new_prompt
+
+        if cmd in {"iv1", "iv2"} and not user_overrode_min_images:
+            params["min_images"] = 2
 
         is_nanobanana = params.get("__model_name__") == "nano-banana" or cmd in {
             "bnn",
