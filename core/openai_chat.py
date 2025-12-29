@@ -86,7 +86,6 @@ class OpenAIChatProvider(BaseProvider):
         返回值: 元组(图片 base64 列表, 状态码, 人类可读的错误信息)
         """
         headers = {
-            "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
         # 构建请求上下文
@@ -94,7 +93,6 @@ class OpenAIChatProvider(BaseProvider):
             params.get("model", provider_config.model), image_b64_list, params
         )
         openai_context["stream"] = False
-        body = json.dumps(openai_context, ensure_ascii=False)
         try:
             impersonate = (
                 provider_config.impersonate.strip()
@@ -118,7 +116,7 @@ class OpenAIChatProvider(BaseProvider):
             response = await self.session.post(
                 url=provider_config.api_url,
                 headers=headers,
-                data=body,
+                json=openai_context,
                 **req_kwargs,
             )
             # 响应反序列化
@@ -192,7 +190,6 @@ class OpenAIChatProvider(BaseProvider):
         返回值: 元组(图片 base64 列表, 状态码, 人类可读的错误信息)
         """
         headers = {
-            "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
         # 构建请求上下文
@@ -200,7 +197,6 @@ class OpenAIChatProvider(BaseProvider):
             params.get("model", provider_config.model), image_b64_list, params
         )
         openai_context["stream"] = True
-        body = json.dumps(openai_context, ensure_ascii=False)
         try:
             impersonate = (
                 provider_config.impersonate.strip()
@@ -223,7 +219,7 @@ class OpenAIChatProvider(BaseProvider):
             response = await self.session.post(
                 url=provider_config.api_url,
                 headers=headers,
-                data=body,
+                json=openai_context,
                 stream=True,
                 **req_kwargs,
             )
