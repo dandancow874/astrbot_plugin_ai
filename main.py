@@ -1766,6 +1766,7 @@ class BigBanana(Star):
         task_id = event.message_obj.message_id
         self.running_tasks[task_id] = task
         task_temp_dir = self.temp_dir / str(task_id)
+        os.makedirs(task_temp_dir, exist_ok=True)
 
         try:
             results, err_msg = await task
@@ -1960,7 +1961,16 @@ class BigBanana(Star):
         
         # 如果未找到指定模型（或未指定），使用第一个启用的模型作为默认
         if not target_model and self.models:
-            target_model = self.models[0]
+            preferred_provider_model = "gemini-3.0-pro-image-portrait"
+            for model in self.models:
+                if any(
+                    (p.model or "").strip() == preferred_provider_model
+                    for p in model.providers
+                ):
+                    target_model = model
+                    break
+            if not target_model:
+                target_model = self.models[0]
             
         if not target_model:
             return None, "未配置任何模型。"
