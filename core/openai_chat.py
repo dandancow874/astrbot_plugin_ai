@@ -229,6 +229,9 @@ class OpenAIChatProvider(BaseProvider):
                 ) as resp:
                     result = await resp.text()
                     if resp.status == 200:
+                        stripped = (result or "").lstrip()
+                        if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
+                            return None, 502, "上游返回HTML，可能是鉴权失败或接口路径错误"
                         reasoning_content = ""
                         content_buf_parts: list[str] = []
                         reasoning_buf_parts: list[str] = []
@@ -326,6 +329,9 @@ class OpenAIChatProvider(BaseProvider):
                     response = await post_request(use_data=True)
                     result = await read_response_text(response)
             if response.status_code == 200:
+                stripped = (result or "").lstrip()
+                if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
+                    return None, 502, "上游返回HTML，可能是鉴权失败或接口路径错误"
                 reasoning_content = ""
                 content_buf_parts: list[str] = []
                 reasoning_buf_parts: list[str] = []

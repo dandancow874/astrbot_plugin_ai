@@ -1951,6 +1951,7 @@ class BigBanana(Star):
         self,
         params: dict,
         image_b64_list: list[tuple[str, str]] = [],
+        allow_fallback: bool = True,
     ) -> tuple[list[tuple[str, str]] | None, str | None]:
         """提供商调度器"""
         err = None
@@ -2022,6 +2023,47 @@ class BigBanana(Star):
             # 如果不是最后一个提供商，且配置了重试逻辑（隐含在列表顺序中），则继续
             if i < len(candidate_providers) - 1:
                 logger.warning(f"{provider.name} 生成图片失败，尝试使用下一个提供商...")
+
+        if allow_fallback:
+            requested_provider_model = (params.get("model") or candidate_providers[0].model or "").strip()
+            is_video_model = requested_provider_model.startswith("veo_")
+            is_flow2api = any((p.name or "").strip() == "flow2api" for p in candidate_providers)
+            html_like_error = isinstance(err, str) and (
+                "HTML" in err
+                or "响应内容格式错误" in err
+                or "状态码 401" in err
+                or "状态码 403" in err
+                or "状态码 404" in err
+            )
+            if is_flow2api and not is_video_model and html_like_error:
+                fallback_model = next(
+                    (m for m in self.models if m.enabled and m.name in {"nano-banana", "Z-Image-Turbo"}),
+                    None,
+                )
+                if not fallback_model:
+                    fallback_model = next(
+                        (
+                            m
+                            for m in self.models
+                            if m.enabled
+                            and m.name != target_model.name
+                            and any((p.name or "").strip() != "flow2api" for p in m.providers)
+                        ),
+                        None,
+                    )
+                if fallback_model:
+                    fallback_params = params.copy()
+                    fallback_params["__model_name__"] = fallback_model.name
+                    fallback_params.pop("provider", None)
+                    images_result, fallback_err = await self._dispatch(
+                        params=fallback_params,
+                        image_b64_list=image_b64_list,
+                        allow_fallback=False,
+                    )
+                    if images_result:
+                        return images_result, None
+                    if fallback_err:
+                        err = fallback_err
 
         # 处理错误信息
         if not err:
