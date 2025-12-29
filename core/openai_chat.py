@@ -231,6 +231,7 @@ class OpenAIChatProvider(BaseProvider):
                     if resp.status == 200:
                         reasoning_content = ""
                         content_buf_parts: list[str] = []
+                        reasoning_buf_parts: list[str] = []
                         for line in result.splitlines():
                             if line.startswith("data: "):
                                 line_data = line[len("data: ") :].strip()
@@ -244,18 +245,24 @@ class OpenAIChatProvider(BaseProvider):
                                             content_buf_parts.append(content)
                                         rc = item.get("delta", {}).get("reasoning_content", "")
                                         if isinstance(rc, str) and rc:
-                                            reasoning_content += rc
+                                            reasoning_buf_parts.append(rc)
                                 except json.JSONDecodeError:
                                     continue
-                        full_content = "".join(content_buf_parts)
-                        b64_images, media_urls = self._extract_media_sources(full_content)
+                        reasoning_content = "".join(reasoning_buf_parts)
+                        full_text = "".join(content_buf_parts) + reasoning_content
+                        b64_images, media_urls = self._extract_media_sources(full_text)
                         if media_urls:
                             b64_images += await self.downloader.fetch_media(media_urls)
                         if not b64_images:
+                            if reasoning_content.strip():
+                                logger.warning(
+                                    f"[BIG BANANA] 请求成功，但未返回媒体数据, 响应内容: {result[:1024]}"
+                                )
+                                return None, 200, reasoning_content.strip()
                             logger.warning(
-                                f"[BIG BANANA] 请求成功，但未返回图片数据, 响应内容: {result[:1024]}"
+                                f"[BIG BANANA] 请求成功，但未返回媒体数据, 响应内容: {result[:1024]}"
                             )
-                            return None, 200, reasoning_content or "响应中未包含图片数据"
+                            return None, 200, "响应中未包含媒体数据"
                         return b64_images, 200, None
                     logger.error(
                         f"[BIG BANANA] 图片生成失败，状态码: {resp.status}, 响应内容: {result[:1024]}"
@@ -321,6 +328,7 @@ class OpenAIChatProvider(BaseProvider):
             if response.status_code == 200:
                 reasoning_content = ""
                 content_buf_parts: list[str] = []
+                reasoning_buf_parts: list[str] = []
                 for line in result.splitlines():
                     if line.startswith("data: "):
                         line_data = line[len("data: ") :].strip()
@@ -335,18 +343,24 @@ class OpenAIChatProvider(BaseProvider):
                                     content_buf_parts.append(content)
                                 rc = item.get("delta", {}).get("reasoning_content", "")
                                 if isinstance(rc, str) and rc:
-                                    reasoning_content += rc
+                                    reasoning_buf_parts.append(rc)
                         except json.JSONDecodeError:
                             continue
-                full_content = "".join(content_buf_parts)
-                b64_images, media_urls = self._extract_media_sources(full_content)
+                reasoning_content = "".join(reasoning_buf_parts)
+                full_text = "".join(content_buf_parts) + reasoning_content
+                b64_images, media_urls = self._extract_media_sources(full_text)
                 if media_urls:
                     b64_images += await self.downloader.fetch_media(media_urls)
                 if not b64_images:
+                    if reasoning_content.strip():
+                        logger.warning(
+                            f"[BIG BANANA] 请求成功，但未返回媒体数据, 响应内容: {result[:1024]}"
+                        )
+                        return None, 200, reasoning_content.strip()
                     logger.warning(
-                        f"[BIG BANANA] 请求成功，但未返回图片数据, 响应内容: {result[:1024]}"
+                        f"[BIG BANANA] 请求成功，但未返回媒体数据, 响应内容: {result[:1024]}"
                     )
-                    return None, 200, reasoning_content or "响应中未包含图片数据"
+                    return None, 200, "响应中未包含媒体数据"
                 return b64_images, 200, None
             else:
                 logger.error(
