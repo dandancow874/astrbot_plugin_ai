@@ -30,9 +30,9 @@
                     "api_base": {
                         "description": "API Base 预设",
                         "type": "string",
-                        "options": ["t8star", "ip"],
-                        "default": "t8star",
-                        "hint": "t8star=ai.t8star.cn；ip=自定义。"
+                        "options": ["zhenzhen", "ip", "hk", "us"],
+                        "default": "zhenzhen",
+                        "hint": "zhenzhen=ai.t8star.cn；ip=自定义；hk/us=预设站点。"
                     },
                     "custom_ip": {
                         "description": "自定义 Base URL",
@@ -43,18 +43,18 @@
                     "api_type": {
                         "description": "接口类型",
                         "type": "string",
-                        "options": ["Gemini"],
-                        "default": "Gemini",
+                        "options": ["OpenAI_Images"],
+                        "default": "OpenAI_Images",
                         "hint": ""
                     },
                     "api_url": {
-                        "description": "Gemini URL",
+                        "description": "OpenAI兼容 Base URL",
                         "type": "string",
                         "default": "https://ai.t8star.cn",
-                        "hint": "推荐填 Base URL，例如 https://ai.t8star.cn。仅填 Base URL 时会自动补全 /v1beta/models。也可填完整 models URL。"
+                        "hint": "推荐填 Base URL，例如 https://ai.t8star.cn。图生图会自动补全为 /v1/images/edits，文生图会自动补全为 /images/generations。也可直接填完整 images URL。"
                     },
                     "api_key": {
-                        "description": "Gemini API Key",
+                        "description": "API Key",
                         "type": "string",
                         "default": "",
                         "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
@@ -62,8 +62,8 @@
                     "model": {
                         "description": "模型名称",
                         "type": "string",
-                        "default": "gemini-3-pro-image-preview",
-                        "hint": "Gemini/Vertex 共用模型名。"
+                        "default": "nano-banana-2-2k",
+                        "hint": "填站点支持的模型名。"
                     },
                     "tls_verify": {
                         "description": "TLS证书验证",
@@ -84,8 +84,8 @@
                     "api_base": {
                         "description": "API Base 预设",
                         "type": "string",
-                        "options": ["t8star", "ip"],
-                        "default": "t8star"
+                        "options": ["zhenzhen", "ip", "hk", "us"],
+                        "default": "zhenzhen"
                     },
                     "custom_ip": {
                         "description": "自定义 Base URL",
@@ -95,18 +95,18 @@
                     "api_type": {
                         "description": "接口类型",
                         "type": "string",
-                        "options": ["Gemini"],
-                        "default": "Gemini",
+                        "options": ["OpenAI_Images"],
+                        "default": "OpenAI_Images",
                         "hint": "留空表示不启用备用。"
                     },
                     "api_url": {
-                        "description": "Gemini URL",
+                        "description": "OpenAI兼容 Base URL",
                         "type": "string",
                         "default": "",
-                        "hint": "留空表示不启用备用。推荐填 Base URL，例如 https://ai.t8star.cn。仅填 Base URL 时会自动补全 /v1beta/models。"
+                        "hint": "留空表示不启用备用。推荐填 Base URL，例如 https://ai.t8star.cn。图生图会自动补全为 /v1/images/edits，文生图会自动补全为 /images/generations。"
                     },
                     "api_key": {
-                        "description": "Gemini API Key",
+                        "description": "API Key",
                         "type": "string",
                         "default": "",
                         "hint": "留空表示不启用备用。"

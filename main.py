@@ -106,12 +106,6 @@ class BigBanana(Star):
                 return url
             if "images/edits" in url or "images/variations" in url:
                 return url
-            if url.endswith("/v1"):
-                return f"{url}/images/generations"
-            if url.endswith("/v1/async"):
-                return f"{url}/images/generations"
-            if "/v1/" not in url and url.count("/") <= 2:
-                return f"{url}/v1/images/generations"
             return url
         return url.rstrip("/")
 
@@ -404,13 +398,16 @@ class BigBanana(Star):
                 def build_provider_item(conf: dict, suffix: str) -> dict:
                     api_base_mapping = {
                         "t8star": "https://ai.t8star.cn",
+                        "zhenzhen": "https://ai.t8star.cn",
+                        "hk": "https://hk-api.gptbest.vip",
+                        "us": "https://api.gptbest.vip",
                     }
                     api_type = conf.get("api_type", None)
                     if not isinstance(api_type, str) or not api_type.strip():
                         api_type = default_provider_stub.get("api_type")
                     api_type = str(api_type).strip()
                     if conf_key == "nanobanana_config":
-                        api_type = "Gemini"
+                        api_type = "OpenAI_Images"
 
                     item = dict(default_provider_stub)
                     item["api_type"] = api_type
@@ -516,12 +513,12 @@ class BigBanana(Star):
             name="nano-banana",
             default_triggers=["bnn", "bnt", "bna"],
             default_provider_stub={
-                "name": "Gemini主账号",
+                "name": "nano-banana账号",
                 "enabled": True,
-                "api_type": "Gemini",
+                "api_type": "OpenAI_Images",
                 "keys": [],
                 "api_url": "https://ai.t8star.cn",
-                "model": "gemini-3-pro-image-preview",
+                "model": "nano-banana-2-2k",
                 "stream": False,
             },
             insert_index=0,
@@ -1072,6 +1069,7 @@ class BigBanana(Star):
     async def add_prompt_quick_command(
         self, event: AstrMessageEvent, trigger_word: str = "", prompt_str: str = ""
     ):
+        """添加提示词预设"""
         if not self.is_global_admin(event):
             logger.info(
                 f"用户 {event.get_sender_id()} 试图执行管理员命令 lmp，权限不足"

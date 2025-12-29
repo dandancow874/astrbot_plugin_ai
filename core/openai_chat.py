@@ -266,6 +266,22 @@ class OpenAIImagesProvider(BaseProvider):
         return "/images/edits" in u or u.endswith("/edits")
 
     @staticmethod
+    def _resolve_images_url(api_url: str, prefer_edits: bool) -> str:
+        base = (api_url or "").strip().rstrip("/")
+        lower = base.lower()
+        if "/images/" in lower or lower.endswith("/edits") or lower.endswith("/generations"):
+            return base
+
+        if base.endswith("/v1/async"):
+            return f"{base}/images/edits" if prefer_edits else f"{base}/images/generations"
+        if base.endswith("/v1"):
+            return f"{base}/images/edits" if prefer_edits else f"{base}/images/generations"
+
+        if prefer_edits:
+            return f"{base}/v1/images/edits"
+        return f"{base}/images/generations"
+
+    @staticmethod
     def _guess_mime_from_b64(b64_data: str) -> str:
         head = (b64_data or "")[:128]
         if not head:
@@ -306,9 +322,22 @@ class OpenAIImagesProvider(BaseProvider):
         image_b64_list: list[tuple[str, str]],
         params: dict,
     ) -> tuple[list[tuple[str, str]] | None, int | None, str | None]:
-        if self._is_edits_url(provider_config.api_url):
+        prefer_edits = bool(image_b64_list)
+        resolved_url = self._resolve_images_url(provider_config.api_url, prefer_edits)
+        if self._is_edits_url(resolved_url):
+            cfg = ProviderConfig(
+                name=provider_config.name,
+                enabled=provider_config.enabled,
+                api_type=provider_config.api_type,
+                keys=provider_config.keys,
+                api_url=resolved_url,
+                model=provider_config.model,
+                stream=provider_config.stream,
+                tls_verify=provider_config.tls_verify,
+                impersonate=provider_config.impersonate,
+            )
             return await self._call_edits_api(
-                provider_config=provider_config,
+                provider_config=cfg,
                 api_key=api_key,
                 image_b64_list=image_b64_list,
                 params=params,
@@ -348,7 +377,7 @@ class OpenAIImagesProvider(BaseProvider):
             if impersonate:
                 req_kwargs["impersonate"] = impersonate
             response = await self.session.post(
-                url=provider_config.api_url,
+                url=resolved_url,
                 headers=headers,
                 json=body,
                 **req_kwargs,

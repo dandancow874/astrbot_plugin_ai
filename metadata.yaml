@@ -1,6 +1,6 @@
 name: astrbot_plugin_ai
 display_name: ai生图
-desc: 图片生成插件，支持Gemini、OpenAI、VertexAI逆向提供商以及高级配置参数。
-version: v0.2.1
+desc: 图片生成插件
+version: v0.2.2
 author: dandancow874
 repo: https://github.com/dandancow874/astrbot_plugin_ai
