@@ -54,6 +54,27 @@ class OpenAIChatProvider(BaseProvider):
         urls = list(dict.fromkeys(urls))
         return b64_items, urls
 
+    def _extract_error_message(self, payload_text: str) -> str | None:
+        if not isinstance(payload_text, str) or not payload_text.strip():
+            return None
+        try:
+            data = json.loads(payload_text)
+        except Exception:
+            return None
+        if not isinstance(data, dict):
+            return None
+        if isinstance(data.get("message"), str) and data["message"].strip():
+            return data["message"].strip()
+        err = data.get("error")
+        if isinstance(err, dict) and isinstance(err.get("message"), str) and err["message"].strip():
+            return err["message"].strip()
+        detail = data.get("detail")
+        if isinstance(detail, list) and detail:
+            first = detail[0]
+            if isinstance(first, dict) and isinstance(first.get("msg"), str) and first["msg"].strip():
+                return first["msg"].strip()
+        return None
+
     async def _call_api(
         self,
         provider_config: ProviderConfig,
@@ -73,6 +94,7 @@ class OpenAIChatProvider(BaseProvider):
             params.get("model", provider_config.model), image_b64_list, params
         )
         openai_context["stream"] = False
+        body = json.dumps(openai_context, ensure_ascii=False)
         try:
             impersonate = (
                 provider_config.impersonate.strip()
@@ -96,7 +118,7 @@ class OpenAIChatProvider(BaseProvider):
             response = await self.session.post(
                 url=provider_config.api_url,
                 headers=headers,
-                json=openai_context,
+                data=body,
                 **req_kwargs,
             )
             # 响应反序列化
@@ -178,6 +200,7 @@ class OpenAIChatProvider(BaseProvider):
             params.get("model", provider_config.model), image_b64_list, params
         )
         openai_context["stream"] = True
+        body = json.dumps(openai_context, ensure_ascii=False)
         try:
             impersonate = (
                 provider_config.impersonate.strip()
@@ -200,7 +223,7 @@ class OpenAIChatProvider(BaseProvider):
             response = await self.session.post(
                 url=provider_config.api_url,
                 headers=headers,
-                json=openai_context,
+                data=body,
                 stream=True,
                 **req_kwargs,
             )
@@ -245,7 +268,14 @@ class OpenAIChatProvider(BaseProvider):
                 logger.error(
                     f"[BIG BANANA] 图片生成失败，状态码: {response.status_code}, 响应内容: {result[:1024]}"
                 )
-                return None, response.status_code, "响应中未包含图片数据"
+                detail = self._extract_error_message(result)
+                return (
+                    None,
+                    response.status_code,
+                    f"图片生成失败: {detail}"
+                    if detail
+                    else f"图片生成失败: 状态码 {response.status_code}",
+                )
         except Timeout as e:
             logger.error(f"[BIG BANANA] 网络请求超时: {e}")
             return None, 408, "图片生成失败：响应超时"
