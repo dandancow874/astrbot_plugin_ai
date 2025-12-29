@@ -226,18 +226,19 @@ class OpenAIChatProvider(BaseProvider):
                         url=provider_config.api_url,
                         headers=headers,
                         data=payload,
-                        stream=True,
                         **req_kwargs,
                     )
                 return await self.session.post(
                     url=provider_config.api_url,
                     headers=headers,
                     json=openai_context,
-                    stream=True,
                     **req_kwargs,
                 )
 
             async def read_response_text(resp) -> str:
+                text = getattr(resp, "text", None)
+                if isinstance(text, str):
+                    return text
                 data = b""
                 async for chunk in resp.aiter_content(chunk_size=1024):
                     data += chunk
