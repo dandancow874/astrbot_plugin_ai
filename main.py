@@ -275,6 +275,21 @@ class BigBanana(Star):
         self.user_whitelist_enabled = self.whitelist_config.get("user_enabled", False)
         self.user_whitelist = self.whitelist_config.get("user_whitelist", [])
 
+        nanobanana_conf = self.conf.get("nanobanana_config", {})
+        if not isinstance(nanobanana_conf, dict):
+            nanobanana_conf = {}
+        nanobanana_whitelist = nanobanana_conf.get("whitelist", {})
+        if not isinstance(nanobanana_whitelist, dict):
+            nanobanana_whitelist = {}
+        self.nanobanana_group_whitelist_enabled = bool(
+            nanobanana_whitelist.get("enabled", False)
+        )
+        self.nanobanana_group_whitelist = nanobanana_whitelist.get("whitelist", [])
+        self.nanobanana_user_whitelist_enabled = bool(
+            nanobanana_whitelist.get("user_enabled", False)
+        )
+        self.nanobanana_user_whitelist = nanobanana_whitelist.get("user_whitelist", [])
+
         # 前缀配置
         prefix_config = self.conf.get("prefix_config", {})
         self.coexist_enabled = prefix_config.get("coexist_enabled", False)
@@ -1396,6 +1411,28 @@ class BigBanana(Star):
         ):
             logger.info(f"用户 {event.get_sender_id()} 不在白名单内，跳过处理")
             return
+
+        nanobanana_model_name = self.prompt_dict.get(cmd, {}).get("__model_name__")
+        is_nanobanana = (
+            nanobanana_model_name == "nano-banana" or cmd in {"bnn", "bnt", "bna"}
+        )
+        if is_nanobanana:
+            if (
+                self.nanobanana_group_whitelist_enabled
+                and event.unified_msg_origin not in self.nanobanana_group_whitelist
+            ):
+                logger.info(
+                    f"群 {event.unified_msg_origin} 不在 nano-banana 白名单内，跳过处理"
+                )
+                return
+            if (
+                self.nanobanana_user_whitelist_enabled
+                and event.get_sender_id() not in self.nanobanana_user_whitelist
+            ):
+                logger.info(
+                    f"用户 {event.get_sender_id()} 不在 nano-banana 白名单内，跳过处理"
+                )
+                return
 
         # 获取提示词配置 (使用 .copy() 防止修改污染全局预设)
         params = self.prompt_dict.get(cmd, {}).copy()

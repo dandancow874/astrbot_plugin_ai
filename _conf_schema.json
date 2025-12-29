@@ -23,6 +23,37 @@
                 "type": "bool",
                 "default": true
             },
+            "whitelist": {
+                "description": "nano-banana 白名单配置",
+                "type": "object",
+                "hint": "仅对 bnn / bnt / bna 生效。",
+                "items": {
+                    "enabled": {
+                        "description": "启用群组白名单",
+                        "type": "bool",
+                        "default": false,
+                        "hint": "开启后，只有在白名单内的群组可以使用 nano-banana。"
+                    },
+                    "whitelist": {
+                        "description": "群组UMO白名单",
+                        "type": "list",
+                        "default": [],
+                        "hint": "白名单群组UMO列表，可在对应群内使用/sid获取。要把UMO写完整。"
+                    },
+                    "user_enabled": {
+                        "description": "启用用户白名单",
+                        "type": "bool",
+                        "default": false,
+                        "hint": "开启后，只有在白名单内的用户可以使用 nano-banana。"
+                    },
+                    "user_whitelist": {
+                        "description": "用户ID白名单",
+                        "type": "list",
+                        "default": [],
+                        "hint": "用户QQ号列表"
+                    }
+                }
+            },
             "primary": {
                 "description": "主提供商",
                 "type": "object",
