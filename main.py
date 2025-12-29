@@ -794,8 +794,8 @@ class BigBanana(Star):
             "bp2": "bp2 {{user_text}} --min_images 1",
             "tv1": "tv1 {{user_text}} --min_images 0",
             "tv2": "tv2 {{user_text}} --min_images 0",
-            "iv1": "iv1 {{user_text}} --min_images 1",
-            "iv2": "iv2 {{user_text}} --min_images 1",
+            "iv1": "iv1 {{user_text}} --min_images 2",
+            "iv2": "iv2 {{user_text}} --min_images 2",
             "rv1": "rv1 {{user_text}} --min_images 1",
             "rv2": "rv2 {{user_text}} --min_images 1",
         }
@@ -1874,6 +1874,7 @@ class BigBanana(Star):
         # 如果图片数量不满足最小要求，且消息平台是Aiocqhttp，取消息发送者头像作为参考图片
         if (
             len(image_urls) < min_required_images
+            and int(min_required_images or 0) == 1
             and event.platform_meta.name == "aiocqhttp"
         ):
             image_urls.append(

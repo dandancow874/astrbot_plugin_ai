@@ -254,11 +254,11 @@ class OpenAIChatProvider(BaseProvider):
                         if media_urls:
                             b64_images += await self.downloader.fetch_media(media_urls)
                         if not b64_images:
-                            if reasoning_content.strip():
+                            if full_text.strip():
                                 logger.warning(
                                     f"[BIG BANANA] 请求成功，但未返回媒体数据, 响应内容: {result[:1024]}"
                                 )
-                                return None, 200, reasoning_content.strip()
+                                return None, 200, full_text.strip()
                             logger.warning(
                                 f"[BIG BANANA] 请求成功，但未返回媒体数据, 响应内容: {result[:1024]}"
                             )
@@ -352,11 +352,11 @@ class OpenAIChatProvider(BaseProvider):
                 if media_urls:
                     b64_images += await self.downloader.fetch_media(media_urls)
                 if not b64_images:
-                    if reasoning_content.strip():
+                    if full_text.strip():
                         logger.warning(
                             f"[BIG BANANA] 请求成功，但未返回媒体数据, 响应内容: {result[:1024]}"
                         )
-                        return None, 200, reasoning_content.strip()
+                        return None, 200, full_text.strip()
                     logger.warning(
                         f"[BIG BANANA] 请求成功，但未返回媒体数据, 响应内容: {result[:1024]}"
                     )
