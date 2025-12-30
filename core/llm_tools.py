@@ -235,7 +235,9 @@ class BigBananaTool(FunctionTool[AstrAgentContext]):
 
         # 创建后台任务
         task = asyncio.create_task(
-            plugin.job(event, params, referer_id=referer_id, is_llm_tool=True)
+            plugin._run_job_with_limit(
+                event, params, referer_id=referer_id, is_llm_tool=True
+            )
         )
         task_id = event.message_obj.message_id
         plugin.running_tasks[task_id] = task

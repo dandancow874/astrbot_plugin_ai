@@ -40,6 +40,7 @@ PARAMS_LIST = [
     "model",
     "provider",
     "preset",
+    "q",
 ]
 
 # 参数别称映射
@@ -72,6 +73,8 @@ MAX_SIZE_B64_LEN = int(MAX_SIZE_BYTES * 4 / 3)
 
 
 class BigBanana(Star):
+    MAX_CONCURRENT_JOBS = 8
+
     @staticmethod
     def _normalize_api_url(api_type: str, api_url: str | None) -> str:
         url = (api_url or "").strip()
@@ -421,6 +424,7 @@ class BigBanana(Star):
 
         # 正在运行的任务映射
         self.running_tasks: dict[str, asyncio.Task] = {}
+        self.job_semaphore: asyncio.Semaphore | None = None
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
@@ -439,6 +443,7 @@ class BigBanana(Star):
         self.http_manager = HttpManager()
         curl_session = self.http_manager._get_curl_session()
         self.downloader = Downloader(curl_session, self.common_config)
+        self.job_semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_JOBS)
 
         # 注册提供商类型实例
         self.init_providers()
@@ -1708,6 +1713,7 @@ class BigBanana(Star):
 
         # 获取提示词配置 (使用 .copy() 防止修改污染全局预设)
         params = self.prompt_dict.get(cmd, {}).copy()
+        params["__trigger_cmd__"] = cmd
         # 先从预设提示词参数字典字典中取出提示词
         preset_prompt = params.get("prompt", "{{user_text}}")
 
@@ -1880,8 +1886,9 @@ class BigBanana(Star):
         logger.debug(
             f"生成图片应用参数: { {k: v for k, v in params.items() if k != 'prompt'} }"
         )
-        # 调用作图任务
-        task = asyncio.create_task(self.job(event, params, image_urls=image_urls))
+        task = asyncio.create_task(
+            self._run_job_with_limit(event, params, image_urls=image_urls)
+        )
         task_id = event.message_obj.message_id
         self.running_tasks[task_id] = task
         task_temp_dir = self.temp_dir / str(task_id)
@@ -1968,6 +1975,13 @@ class BigBanana(Star):
             ):
                 image_urls.append(comp.url)
 
+        q_value = params.get("q")
+        if q_value and event.platform_meta.name == "aiocqhttp":
+            for qq in re.findall(r"\d+", str(q_value)):
+                build_url = f"https://q.qlogo.cn/g?b=qq&s=0&nk={qq}"
+                if build_url not in image_urls:
+                    image_urls.append(build_url)
+
         # 处理referer_id参数，获取指定用户头像
         if is_llm_tool and referer_id and event.platform_meta.name == "aiocqhttp":
             for target_id in referer_id:
@@ -1978,6 +1992,18 @@ class BigBanana(Star):
                         image_urls.append(
                             f"https://q.qlogo.cn/g?b=qq&s=0&nk={target_id}"
                         )
+
+        trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
+        is_i2i_mode = trigger_cmd in {"bp1", "bp2", "edit"}
+        if (
+            is_i2i_mode
+            and not image_urls
+            and not params.get("refer_images")
+            and event.platform_meta.name == "aiocqhttp"
+        ):
+            image_urls.append(
+                f"https://q.qlogo.cn/g?b=qq&s=0&nk={event.get_sender_id()}"
+            )
 
         min_required_images = params.get("min_images", self.prompt_config.min_images)
         max_allowed_images = params.get("max_images", self.prompt_config.max_images)
@@ -2052,6 +2078,45 @@ class BigBanana(Star):
             save_images(valid_results, self.save_dir)
 
         return valid_results, None
+
+    async def _run_job_with_limit(
+        self,
+        event: AstrMessageEvent,
+        params: dict,
+        image_urls: list[str] | None = None,
+        referer_id: list[str] | None = None,
+        is_llm_tool: bool = False,
+    ) -> tuple[list[tuple[str, str]] | None, str | None]:
+        if self.is_global_admin(event):
+            return await self.job(
+                event=event,
+                params=params,
+                image_urls=image_urls,
+                referer_id=referer_id,
+                is_llm_tool=is_llm_tool,
+            )
+
+        sem = self.job_semaphore
+        if sem is None:
+            return await self.job(
+                event=event,
+                params=params,
+                image_urls=image_urls,
+                referer_id=referer_id,
+                is_llm_tool=is_llm_tool,
+            )
+
+        await sem.acquire()
+        try:
+            return await self.job(
+                event=event,
+                params=params,
+                image_urls=image_urls,
+                referer_id=referer_id,
+                is_llm_tool=is_llm_tool,
+            )
+        finally:
+            sem.release()
 
     async def _dispatch(
         self,
