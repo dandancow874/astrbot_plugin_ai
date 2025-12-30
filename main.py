@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import json
 import os
+import re
 
 import astrbot.api.message_components as Comp
 from astrbot.api import logger
@@ -122,8 +123,11 @@ class BigBanana(Star):
     def _collect_image_urls(self, event: AstrMessageEvent) -> list[str]:
         image_urls: list[str] = []
         for comp in event.get_messages():
-            if isinstance(comp, Comp.Reply) and comp.chain:
-                for quote in comp.chain:
+            if isinstance(comp, Comp.Reply) and getattr(comp, "chain", None):
+                quote_chain = comp.chain
+                if not isinstance(quote_chain, list) and hasattr(quote_chain, "chain"):
+                    quote_chain = getattr(quote_chain, "chain", None)
+                for quote in quote_chain or []:
                     if isinstance(quote, Comp.Image) and quote.url:
                         image_urls.append(quote.url)
                     elif (
@@ -143,6 +147,116 @@ class BigBanana(Star):
             ):
                 image_urls.append(comp.url)
         return image_urls
+
+    async def _try_call_platform_api(
+        self, event: AstrMessageEvent, action: str, params: dict
+    ) -> object | None:
+        candidates: list[object] = [event]
+        for attr in ("bot", "_bot", "platform", "client", "_client"):
+            obj = getattr(event, attr, None)
+            if obj is not None:
+                candidates.append(obj)
+
+        for target in candidates:
+            for method_name in ("call_action", "call_api", "api_call", "request"):
+                method = getattr(target, method_name, None)
+                if not callable(method):
+                    continue
+                try:
+                    return await method(action, **params)
+                except TypeError:
+                    try:
+                        return await method(action, params)
+                    except Exception:
+                        continue
+                except Exception:
+                    continue
+        return None
+
+    async def _collect_reply_image_urls(
+        self, event: AstrMessageEvent, reply_comp: object
+    ) -> tuple[list[str], str]:
+        urls: list[str] = []
+        reply_sender_id = str(getattr(reply_comp, "sender_id", "") or "")
+
+        quote_chain = getattr(reply_comp, "chain", None)
+        if quote_chain is not None:
+            if not isinstance(quote_chain, list) and hasattr(quote_chain, "chain"):
+                quote_chain = getattr(quote_chain, "chain", None)
+            for quote in quote_chain or []:
+                if isinstance(quote, Comp.Image) and quote.url:
+                    urls.append(quote.url)
+                elif (
+                    isinstance(quote, Comp.File)
+                    and quote.url
+                    and quote.url.startswith("http")
+                    and quote.url.lower().endswith(SUPPORTED_FILE_FORMATS)
+                ):
+                    urls.append(quote.url)
+            if urls:
+                return urls, reply_sender_id
+
+        reply_id = None
+        for key in ("id", "message_id", "msg_id", "reply_id"):
+            value = getattr(reply_comp, key, None)
+            if value is None:
+                continue
+            if isinstance(value, (int, str)) and str(value).strip():
+                reply_id = str(value).strip()
+                break
+
+        if not reply_id:
+            return [], reply_sender_id
+
+        resp = await self._try_call_platform_api(
+            event, "get_msg", {"message_id": int(reply_id)}
+        )
+        if resp is None:
+            return [], reply_sender_id
+
+        data = resp
+        if isinstance(resp, dict) and "data" in resp:
+            data = resp.get("data")
+
+        message = None
+        if isinstance(data, dict):
+            message = (
+                data.get("message")
+                or data.get("message_chain")
+                or data.get("messageChain")
+                or data.get("raw_message")
+            )
+
+        def append_if_media(url: object):
+            if not isinstance(url, str):
+                return
+            u = url.strip()
+            if not u:
+                return
+            if u.startswith("http") and u.lower().endswith(SUPPORTED_FILE_FORMATS):
+                urls.append(u)
+                return
+            if u.startswith("http") and any(ext in u.lower() for ext in SUPPORTED_FILE_FORMATS):
+                urls.append(u)
+
+        if isinstance(message, list):
+            for seg in message:
+                if not isinstance(seg, dict):
+                    continue
+                t = seg.get("type")
+                d = seg.get("data") if isinstance(seg.get("data"), dict) else {}
+                if t == "image":
+                    append_if_media(d.get("url") or d.get("file"))
+                elif t == "file":
+                    append_if_media(d.get("url") or d.get("name") or d.get("file"))
+            return urls, reply_sender_id
+
+        if isinstance(message, str) and message:
+            for m in re.finditer(r"url=([^,\\]]+)", message):
+                append_if_media(m.group(1))
+            for m in re.finditer(r"file=([^,\\]]+)", message):
+                append_if_media(m.group(1))
+        return urls, reply_sender_id
 
     async def _image_to_prompt(
         self, event: AstrMessageEvent, prompt: str, min_required_images: int
@@ -1815,18 +1929,10 @@ class BigBanana(Star):
         skipped_at_qq = False
         reply_sender_id = ""
         for comp in event.get_messages():
-            if isinstance(comp, Comp.Reply) and comp.chain:
-                reply_sender_id = str(comp.sender_id)
-                for quote in comp.chain:
-                    if isinstance(quote, Comp.Image) and quote.url:
-                        image_urls.append(quote.url)
-                    elif (
-                        isinstance(quote, Comp.File)
-                        and quote.url
-                        and quote.url.startswith("http")
-                        and quote.url.lower().endswith(SUPPORTED_FILE_FORMATS)
-                    ):
-                        image_urls.append(quote.url)
+            if isinstance(comp, Comp.Reply):
+                reply_urls, reply_sender_id = await self._collect_reply_image_urls(event, comp)
+                if reply_urls:
+                    image_urls.extend(reply_urls)
             # 处理At对象的QQ头像（对于艾特机器人的问题，还没有特别好的解决方案）
             elif (
                 isinstance(comp, Comp.At)
