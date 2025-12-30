@@ -80,12 +80,18 @@ class Downloader:
                 proxy=self.def_common_config.proxy,
                 timeout=30,
             )
+            if self._looks_like_html(response):
+                logger.warning(f"[BIG BANANA] 下载图片疑似返回HTML，已跳过: {url}")
+                return None
             content = self._handle_image(response.content)
             return content
         except (SSLError, CertificateVerifyError):
             response = await self.session.get(
                 url, impersonate="chrome131", timeout=30, verify=False
             )
+            if self._looks_like_html(response):
+                logger.warning(f"[BIG BANANA] 下载图片疑似返回HTML，已跳过: {url}")
+                return None
             content = self._handle_image(response.content)
             return content
         except Timeout as e:
@@ -94,6 +100,27 @@ class Downloader:
         except Exception as e:
             logger.error(f"[BIG BANANA] 下载图片失败: {url}，错误信息：{e}")
             return None
+
+    @staticmethod
+    def _looks_like_html(response) -> bool:
+        try:
+            headers = getattr(response, "headers", None) or {}
+            ct = headers.get("Content-Type") or headers.get("content-type") or ""
+            if isinstance(ct, str) and ";" in ct:
+                ct = ct.split(";", 1)[0].strip()
+            ct_lower = ct.lower() if isinstance(ct, str) else ""
+            if ct_lower in {"text/html", "application/xhtml+xml"}:
+                return True
+
+            content = getattr(response, "content", b"") or b""
+            if isinstance(content, (bytes, bytearray)):
+                head = bytes(content[:512]).lstrip()
+                head_lower = head.lower()
+                if head_lower.startswith(b"<!doctype html") or head_lower.startswith(b"<html"):
+                    return True
+        except Exception:
+            return False
+        return False
 
     async def _download_media(self, url: str) -> tuple[str, str] | None:
         try:
@@ -116,6 +143,10 @@ class Downloader:
             return None
         except Exception as e:
             logger.error(f"[BIG BANANA] 下载媒体失败: {url}，错误信息：{e}")
+            return None
+
+        if self._looks_like_html(response):
+            logger.warning(f"[BIG BANANA] 下载媒体疑似返回HTML，已跳过: {url}")
             return None
 
         mime = None

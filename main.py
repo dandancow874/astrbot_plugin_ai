@@ -2137,6 +2137,7 @@ class BigBanana(Star):
             html_like_error = isinstance(err, str) and (
                 "HTML" in err
                 or "响应内容格式错误" in err
+                or "媒体下载失败" in err
                 or "状态码 401" in err
                 or "状态码 403" in err
                 or "状态码 404" in err
