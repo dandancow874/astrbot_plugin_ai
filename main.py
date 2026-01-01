@@ -535,12 +535,13 @@ class BigBanana(Star):
                         "zhenzhen": "https://ai.t8star.cn",
                         "hk": "https://hk-api.gptbest.vip",
                         "us": "https://api.gptbest.vip",
+                        "grsai": "https://grsaiapi.com",
                     }
                     api_type = conf.get("api_type", None)
                     if not isinstance(api_type, str) or not api_type.strip():
                         api_type = default_provider_stub.get("api_type")
                     api_type = str(api_type).strip()
-                    if conf_key == "nanobanana_config":
+                    if conf_key == "nanobanana_config" and suffix == "主":
                         api_type = "OpenAI_Images"
 
                     item = dict(default_provider_stub)
@@ -597,6 +598,15 @@ class BigBanana(Star):
                 secondary_key = secondary_conf.get("api_key", "")
                 secondary_api_type = secondary_conf.get("api_type", "")
                 secondary_model = secondary_conf.get("model", "")
+                if conf_key == "nanobanana_config" and not (
+                    str(secondary_api_type).strip()
+                    or str(secondary_url).strip()
+                    or str(secondary_key).strip()
+                    or str(secondary_model).strip()
+                ):
+                    secondary_url = "https://grsaiapi.com"
+                    secondary_api_type = "OpenAI_Chat"
+                    secondary_model = "nano-banana-pro"
                 if (
                     str(secondary_api_type).strip() == "Vertex_AI_Anonymous"
                     or str(secondary_url).strip()
@@ -1723,7 +1733,13 @@ class BigBanana(Star):
         user_prompt = user_params.get("prompt", "anything").strip()
 
         if preset_name:
-            preset_params = self.prompt_dict.get(str(preset_name), None)
+            preset_key = str(preset_name).strip()
+            preset_params = self.prompt_dict.get(preset_key, None)
+            if not preset_params and preset_key:
+                for k, v in self.prompt_dict.items():
+                    if isinstance(k, str) and k.strip() == preset_key:
+                        preset_params = v
+                        break
             if not preset_params:
                 yield event.plain_result(f"❌ 未找到预设提示词：「{preset_name}」")
                 return
