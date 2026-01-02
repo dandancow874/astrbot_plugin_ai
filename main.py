@@ -556,67 +556,67 @@ class BigBanana(Star):
             if not isinstance(primary_conf, dict):
                 primary_conf = {}
 
-                def build_provider_item(conf: dict, suffix: str) -> dict:
-                    api_base_mapping = {
-                        "t8star": "https://ai.t8star.cn",
-                        "zhenzhen": "https://ai.t8star.cn",
-                        "hk": "https://hk-api.gptbest.vip",
-                        "us": "https://api.gptbest.vip",
-                        "grsai": "https://grsai.dakka.com.cn",
-                    }
-                    api_type = conf.get("api_type", None)
-                    if not isinstance(api_type, str) or not api_type.strip():
-                        api_type = default_provider_stub.get("api_type")
-                    api_type = str(api_type).strip()
-                    if conf_key == "nanobanana_config":
-                        if suffix == "主":
-                            api_type = "OpenAI_Chat"
-                        elif suffix == "备" and not str(conf.get("api_type", "") or "").strip():
-                            api_type = "OpenAI_Images"
+            def build_provider_item(conf: dict, suffix: str) -> dict:
+                api_base_mapping = {
+                    "t8star": "https://ai.t8star.cn",
+                    "zhenzhen": "https://ai.t8star.cn",
+                    "hk": "https://hk-api.gptbest.vip",
+                    "us": "https://api.gptbest.vip",
+                    "grsai": "https://grsai.dakka.com.cn",
+                }
+                api_type = conf.get("api_type", None)
+                if not isinstance(api_type, str) or not api_type.strip():
+                    api_type = default_provider_stub.get("api_type")
+                api_type = str(api_type).strip()
+                if conf_key == "nanobanana_config":
+                    if suffix == "主":
+                        api_type = "OpenAI_Chat"
+                    elif suffix == "备" and not str(conf.get("api_type", "") or "").strip():
+                        api_type = "OpenAI_Images"
 
-                    item = dict(default_provider_stub)
-                    item["api_type"] = api_type
+                item = dict(default_provider_stub)
+                item["api_type"] = api_type
 
-                    model_name = conf.get("model", None)
-                    if isinstance(model_name, str) and model_name.strip():
-                        item["model"] = model_name.strip()
+                model_name = conf.get("model", None)
+                if isinstance(model_name, str) and model_name.strip():
+                    item["model"] = model_name.strip()
 
-                    url = conf.get("api_url", model_conf.get("api_url", ""))
-                    api_base = conf.get("api_base", None)
-                    if isinstance(api_base, str) and api_base.strip():
-                        api_base = api_base.strip()
-                        if api_base == "ip":
-                            custom_ip = conf.get("custom_ip", None)
-                            if isinstance(custom_ip, str) and custom_ip.strip():
-                                url = custom_ip.strip()
-                        elif api_base in api_base_mapping:
-                            url = api_base_mapping[api_base]
-                    item["api_url"] = url
+                url = conf.get("api_url", model_conf.get("api_url", ""))
+                api_base = conf.get("api_base", None)
+                if isinstance(api_base, str) and api_base.strip():
+                    api_base = api_base.strip()
+                    if api_base == "ip":
+                        custom_ip = conf.get("custom_ip", None)
+                        if isinstance(custom_ip, str) and custom_ip.strip():
+                            url = custom_ip.strip()
+                    elif api_base in api_base_mapping:
+                        url = api_base_mapping[api_base]
+                item["api_url"] = url
 
-                    tls_verify = conf.get("tls_verify", None)
-                    if isinstance(tls_verify, bool):
-                        item["tls_verify"] = tls_verify
-                    impersonate = conf.get("impersonate", None)
-                    if isinstance(impersonate, str) and impersonate.strip():
-                        item["impersonate"] = impersonate.strip()
+                tls_verify = conf.get("tls_verify", None)
+                if isinstance(tls_verify, bool):
+                    item["tls_verify"] = tls_verify
+                impersonate = conf.get("impersonate", None)
+                if isinstance(impersonate, str) and impersonate.strip():
+                    item["impersonate"] = impersonate.strip()
 
-                    if (
-                        item.get("api_type") == "OpenAI_Chat"
-                        and isinstance(url, str)
-                        and "/images/" in url.lower()
-                    ):
-                        item["api_type"] = "OpenAI_Images"
+                if (
+                    item.get("api_type") == "OpenAI_Chat"
+                    and isinstance(url, str)
+                    and "/images/" in url.lower()
+                ):
+                    item["api_type"] = "OpenAI_Images"
 
-                    if api_type == "Vertex_AI_Anonymous":
-                        item["keys"] = []
-                        base_name = "Vertex匿名"
-                    else:
-                        key = conf.get("api_key", model_conf.get("api_key", ""))
-                        item["keys"] = parse_keys(key)
-                        base_name = str(default_provider_stub.get("name", name))
+                if api_type == "Vertex_AI_Anonymous":
+                    item["keys"] = []
+                    base_name = "Vertex匿名"
+                else:
+                    key = conf.get("api_key", model_conf.get("api_key", ""))
+                    item["keys"] = parse_keys(key)
+                    base_name = str(default_provider_stub.get("name", name))
 
-                    item["name"] = f"{base_name}_{suffix}"
-                    return item
+                item["name"] = f"{base_name}_{suffix}"
+                return item
 
             providers = model_conf.get("providers", None)
             if not isinstance(providers, list) or not providers:
@@ -2273,6 +2273,9 @@ class BigBanana(Star):
         allow_fallback: bool = True,
     ) -> tuple[list[tuple[str, str]] | None, str | None]:
         """提供商调度器"""
+        if not getattr(self, "models", None):
+            self.init_providers()
+            self.init_prompts()
         err = None
 
         async def _try_grsai_images_fallback(
