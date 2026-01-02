@@ -475,8 +475,20 @@ class BigBanana(Star):
             self.context.add_llm_tools(BigBananaPromptTool(plugin=self))
             logger.info("已注册函数调用工具: banana_preset_prompt")
 
+    def _ensure_provider_registry(self) -> None:
+        try:
+            from importlib import import_module
+
+            pkg = __package__ or "astrbot_plugin_ai"
+            import_module(f"{pkg}.core.openai_chat")
+            import_module(f"{pkg}.core.gemini")
+            import_module(f"{pkg}.core.vertex_ai_anonymous")
+        except Exception:
+            return
+
     def init_providers(self):
         """解析提供商配置"""
+        self._ensure_provider_registry()
         # 模型配置列表
         self.models: list[ModelConfig] = []
         # 提供商实例映射
@@ -2460,8 +2472,21 @@ class BigBanana(Star):
         # 调度提供商
         for i, provider in enumerate(candidate_providers):
             if provider.api_type not in self.provider_map:
-                logger.warning(f"提供商类型 {provider.api_type} 未初始化，跳过")
-                continue
+                provider_cls = BaseProvider.get_provider_class(provider.api_type)
+                if provider_cls is None:
+                    self._ensure_provider_registry()
+                    provider_cls = BaseProvider.get_provider_class(provider.api_type)
+                if provider_cls is None:
+                    logger.warning(f"提供商类型 {provider.api_type} 未初始化，跳过")
+                    continue
+                self.provider_map[provider.api_type] = provider_cls(
+                    config=self.conf,
+                    common_config=self.common_config,
+                    prompt_config=self.prompt_config,
+                    session=self.http_manager._get_curl_session(),
+                    downloader=self.downloader,
+                    aiohttp_session=self.http_manager._get_aiohttp_session(),
+                )
                 
             images_result, err = await self.provider_map[
                 provider.api_type
