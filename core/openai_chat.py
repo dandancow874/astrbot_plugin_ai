@@ -248,6 +248,9 @@ class OpenAIChatProvider(BaseProvider):
                 return b64_images, 200, None
 
             if response.status_code == 404:
+                detail = None
+                if isinstance(resp_text, str):
+                    detail = self._extract_error_message(resp_text)
                 if "grsaiapi.com" in (provider_config.api_url or "").lower():
                     for alt in self._derive_alt_chat_urls(provider_config.api_url):
                         try:
@@ -275,6 +278,12 @@ class OpenAIChatProvider(BaseProvider):
                                 return None, 200, "响应中未包含图片数据"
                         except Exception:
                             continue
+                if detail:
+                    return (
+                        None,
+                        404,
+                        f"图片生成失败: {detail}（{provider_config.api_url}）",
+                    )
                 return None, 404, f"图片生成失败：API 地址不存在（{provider_config.api_url}）"
 
             logger.error(
