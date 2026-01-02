@@ -2245,12 +2245,37 @@ class BigBanana(Star):
 
         async def _try_grsai_images_fallback(
             provider: ProviderConfig,
+            last_err: str | None,
         ) -> tuple[list[tuple[str, str]] | None, str | None]:
             if provider.api_type != "OpenAI_Chat":
                 return None, None
             api_url = (provider.api_url or "").strip()
             if "grsaiapi.com" not in api_url.lower():
                 return None, None
+
+            alias_models: list[str] = []
+            cur_model = (params.get("model") or provider.model or "").strip()
+            if isinstance(last_err, str) and (
+                "不支持的模型" in last_err or "unsupported model" in last_err.lower()
+            ):
+                if cur_model == "nano-banana-pro":
+                    alias_models.append("gemini-3-pro-image-preview")
+
+            if alias_models:
+                chat_provider = self.provider_map.get("OpenAI_Chat")
+                if chat_provider is not None:
+                    for alt_model in alias_models:
+                        alt_params = params.copy()
+                        alt_params["model"] = alt_model
+                        alt_images, alt_err = await chat_provider.generate_images(
+                            provider_config=provider,
+                            params=alt_params,
+                            image_b64_list=image_b64_list,
+                        )
+                        if alt_images:
+                            return alt_images, None
+                        if isinstance(alt_err, str) and alt_err.strip():
+                            last_err = alt_err
 
             images_provider = self.provider_map.get("OpenAI_Images")
             if images_provider is None:
@@ -2286,11 +2311,23 @@ class BigBanana(Star):
                 tls_verify=provider.tls_verify,
                 impersonate=provider.impersonate,
             )
-            return await images_provider.generate_images(
-                provider_config=fallback_provider,
-                params=params,
-                image_b64_list=image_b64_list,
-            )
+            try_params_list: list[dict] = [params]
+            for alt_model in alias_models:
+                alt_params = params.copy()
+                alt_params["model"] = alt_model
+                try_params_list.append(alt_params)
+
+            for try_params in try_params_list:
+                images, gen_err = await images_provider.generate_images(
+                    provider_config=fallback_provider,
+                    params=try_params,
+                    image_b64_list=image_b64_list,
+                )
+                if images:
+                    return images, None
+                if isinstance(gen_err, str) and gen_err.strip():
+                    last_err = gen_err
+            return None, last_err
         
         # 1. 确定使用的模型
         model_name = params.get("__model_name__")
@@ -2379,11 +2416,12 @@ class BigBanana(Star):
                 and isinstance(err, str)
                 and (
                     "不存在该模型" in err
+                    or "不支持的模型" in err
                     or "响应中未包含图片数据" in err
                     or "响应中未包含媒体数据" in err
                 )
             ):
-                fallback_images, fallback_err = await _try_grsai_images_fallback(provider)
+                fallback_images, fallback_err = await _try_grsai_images_fallback(provider, err)
                 if fallback_images:
                     logger.info(f"模型 {target_model.name} - {provider.name} 图片生成成功")
                     return fallback_images, None

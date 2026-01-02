@@ -386,6 +386,13 @@ class OpenAIChatProvider(BaseProvider):
                                 502,
                                 f"上游返回HTML，可能是鉴权失败或接口路径错误（{provider_config.api_url}）",
                             )
+                        if stripped.startswith("{"):
+                            prefix = stripped
+                            if "data:" in prefix:
+                                prefix = prefix.split("data:", 1)[0].strip()
+                            detail = self._extract_error_message(prefix)
+                            if detail:
+                                return None, 400, f"图片生成失败: {detail}"
                         reasoning_content = ""
                         content_buf_parts: list[str] = []
                         reasoning_buf_parts: list[str] = []
