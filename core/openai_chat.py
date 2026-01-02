@@ -20,6 +20,147 @@ class OpenAIChatProvider(BaseProvider):
 
     api_type: str = "OpenAI_Chat"
 
+    @staticmethod
+    def _is_grsai(api_url: object) -> bool:
+        return isinstance(api_url, str) and "grsaiapi.com" in api_url.lower()
+
+    @staticmethod
+    def _resolve_grsai_draw_url(api_url: str) -> str:
+        raw = (api_url or "").strip().rstrip("/")
+        lowered = raw.lower()
+        root = raw
+        if "/v1/" in lowered:
+            root = raw.split("/v1/", 1)[0]
+        elif lowered.endswith("/v1"):
+            root = raw[: -len("/v1")]
+        if "/chat/completions" in root.lower():
+            root = root.split("/chat/completions", 1)[0]
+        return root.rstrip("/") + "/v1/draw/nano-banana"
+
+    @staticmethod
+    def _extract_grsai_result_urls(payload: object) -> list[str]:
+        urls: list[str] = []
+        if not isinstance(payload, dict):
+            return urls
+        results = payload.get("results")
+        if isinstance(results, list):
+            for item in results:
+                if not isinstance(item, dict):
+                    continue
+                u = item.get("url")
+                if isinstance(u, str) and u.strip():
+                    urls.append(u.strip())
+        if not urls:
+            u = payload.get("url")
+            if isinstance(u, str) and u.strip():
+                urls.append(u.strip())
+        return list(dict.fromkeys(urls))
+
+    async def _call_grsai_draw_api(
+        self,
+        provider_config: ProviderConfig,
+        api_key: str,
+        params: dict,
+    ) -> tuple[list[tuple[str, str]] | None, int | None, str | None]:
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        model = (params.get("model") or provider_config.model or "").strip()
+        prompt = params.get("prompt", "anything")
+        urls = params.get("__source_image_urls__")
+        if not isinstance(urls, list):
+            urls = []
+        urls = [u.strip() for u in urls if isinstance(u, str) and u.strip()]
+
+        payload: dict = {
+            "model": model,
+            "prompt": prompt,
+            "urls": urls,
+            "shutProgress": True,
+            "cdn": "zh",
+        }
+        image_size = params.get("image_size")
+        if isinstance(image_size, str) and image_size.strip() in {"1K", "2K", "4K"}:
+            payload["imageSize"] = image_size.strip()
+        aspect_ratio = params.get("aspect_ratio")
+        if isinstance(aspect_ratio, str):
+            ar = aspect_ratio.strip()
+            if ar and ar.lower() != "default":
+                payload["aspectRatio"] = ar
+
+        url = self._resolve_grsai_draw_url(provider_config.api_url)
+        try:
+            impersonate = (
+                provider_config.impersonate.strip()
+                if isinstance(provider_config.impersonate, str)
+                and provider_config.impersonate.strip()
+                else None
+            )
+            verify = (
+                provider_config.tls_verify
+                if isinstance(provider_config.tls_verify, bool)
+                else True
+            )
+            req_kwargs = {
+                "timeout": self.def_common_config.timeout,
+                "proxy": self.def_common_config.proxy,
+                "verify": verify,
+            }
+            if impersonate:
+                req_kwargs["impersonate"] = impersonate
+
+            response = await self.session.post(
+                url=url,
+                headers=headers,
+                json=payload,
+                **req_kwargs,
+            )
+            resp_text = getattr(response, "text", "")
+            if isinstance(resp_text, str):
+                stripped = resp_text.lstrip()
+                lowered = stripped.lower()
+                if lowered.startswith("<!doctype html") or lowered.startswith("<html") or "<html" in lowered:
+                    return (
+                        None,
+                        502,
+                        f"上游返回HTML，可能是鉴权失败或接口路径错误（{url}）",
+                    )
+
+            if response.status_code != 200:
+                detail = self._extract_error_message(resp_text if isinstance(resp_text, str) else "")
+                return (
+                    None,
+                    response.status_code,
+                    f"图片生成失败: {detail}" if detail else f"图片生成失败: 状态码 {response.status_code}",
+                )
+
+            json_text = resp_text if isinstance(resp_text, str) else ""
+            if isinstance(json_text, str) and json_text.startswith("data: "):
+                json_text = json_text[6:].strip()
+            try:
+                result = json.loads(json_text) if isinstance(json_text, str) else {}
+            except Exception:
+                result = {}
+            detail = self._extract_error_message(json_text if isinstance(json_text, str) else "")
+            if detail and not self._extract_grsai_result_urls(result):
+                return None, 400, f"图片生成失败: {detail}"
+
+            media_urls = self._extract_grsai_result_urls(result)
+            if not media_urls:
+                return None, 200, "响应中未包含图片数据"
+            b64_images = await self.downloader.fetch_media(media_urls)
+            b64_images = [(mime, b64) for mime, b64 in b64_images if b64]
+            if not b64_images:
+                return None, 200, "媒体下载失败"
+            return b64_images, 200, None
+        except Timeout as e:
+            logger.error(f"[BIG BANANA] 网络请求超时: {e}")
+            return None, 408, "图片生成失败：响应超时"
+        except Exception as e:
+            logger.error(f"[BIG BANANA] 请求错误: {e}")
+            return None, None, "图片生成失败：程序错误"
+
     def _extract_media_sources(
         self, content: str
     ) -> tuple[list[tuple[str, str]], list[str]]:
@@ -185,6 +326,14 @@ class OpenAIChatProvider(BaseProvider):
         """发起 OpenAI 图片生成请求
         返回值: 元组(图片 base64 列表, 状态码, 人类可读的错误信息)
         """
+        if self._is_grsai(provider_config.api_url):
+            model = (params.get("model") or provider_config.model or "").strip()
+            if model.startswith("nano-banana"):
+                return await self._call_grsai_draw_api(
+                    provider_config=provider_config,
+                    api_key=api_key,
+                    params=params,
+                )
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -336,6 +485,14 @@ class OpenAIChatProvider(BaseProvider):
         """发起 OpenAI 图片生成流式请求
         返回值: 元组(图片 base64 列表, 状态码, 人类可读的错误信息)
         """
+        if self._is_grsai(provider_config.api_url):
+            model = (params.get("model") or provider_config.model or "").strip()
+            if model.startswith("nano-banana"):
+                return await self._call_grsai_draw_api(
+                    provider_config=provider_config,
+                    api_key=api_key,
+                    params=params,
+                )
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",

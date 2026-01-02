@@ -144,28 +144,28 @@
                     "api_base": {
                         "description": "API Base 预设",
                         "type": "string",
-                        "options": ["zhenzhen", "ip", "hk", "us"],
-                        "default": "zhenzhen",
-                        "hint": "zhenzhen=ai.t8star.cn；ip=自定义；hk/us=预设站点。"
+                        "options": ["grsai", "zhenzhen", "ip", "hk", "us"],
+                        "default": "grsai",
+                        "hint": "grsai=grsaiapi.com；zhenzhen=ai.t8star.cn；ip=自定义；hk/us=预设站点。"
                     },
                     "custom_ip": {
                         "description": "自定义 Base URL",
                         "type": "string",
                         "default": "",
-                        "hint": "当 api_base=ip 时填写，例如 https://ai.t8star.cn。"
+                        "hint": "当 api_base=ip 时填写，例如 https://grsaiapi.com 或 https://ai.t8star.cn。"
                     },
                     "api_type": {
                         "description": "接口类型",
                         "type": "string",
-                        "options": ["OpenAI_Images"],
-                        "default": "OpenAI_Images",
+                        "options": ["OpenAI_Chat"],
+                        "default": "OpenAI_Chat",
                         "hint": ""
                     },
                     "api_url": {
                         "description": "OpenAI兼容 Base URL",
                         "type": "string",
-                        "default": "https://ai.t8star.cn",
-                        "hint": "推荐填 Base URL，例如 https://ai.t8star.cn。图生图会自动补全为 /v1/images/edits，文生图会自动补全为 /images/generations。也可直接填完整 images URL。"
+                        "default": "https://grsaiapi.com",
+                        "hint": "推荐填 Base URL，例如 https://grsaiapi.com。插件会将 nano-banana* 模型请求路由到 /v1/draw/nano-banana。也可填 /v1/chat/completions，仍可自动识别。"
                     },
                     "api_key": {
                         "description": "API Key",
@@ -176,8 +176,8 @@
                     "model": {
                         "description": "模型名称",
                         "type": "string",
-                        "default": "nano-banana-2-2k",
-                        "hint": "填站点支持的模型名。"
+                        "default": "nano-banana-pro",
+                        "hint": "填 grsai 支持的模型名，例如 nano-banana-pro。"
                     },
                     "tls_verify": {
                         "description": "TLS证书验证",
@@ -198,7 +198,7 @@
                     "api_base": {
                         "description": "API Base 预设",
                         "type": "string",
-                        "options": ["zhenzhen", "ip", "hk", "us"],
+                        "options": ["grsai", "zhenzhen", "ip", "hk", "us"],
                         "default": "zhenzhen"
                     },
                     "custom_ip": {
@@ -216,8 +216,8 @@
                     "api_url": {
                         "description": "OpenAI兼容 Base URL",
                         "type": "string",
-                        "default": "",
-                        "hint": "留空表示不启用备用。推荐填 Base URL，例如 https://ai.t8star.cn。图生图会自动补全为 /v1/images/edits，文生图会自动补全为 /images/generations。"
+                        "default": "https://ai.t8star.cn",
+                        "hint": "留空表示不启用备用。备用一般填 https://ai.t8star.cn（OpenAI Images 兼容）。"
                     },
                     "api_key": {
                         "description": "API Key",
@@ -228,8 +228,8 @@
                     "model": {
                         "description": "模型名称",
                         "type": "string",
-                        "default": "",
-                        "hint": "留空使用默认模型名。"
+                        "default": "nano-banana-2-2k",
+                        "hint": "备用站点模型名，例如 nano-banana-2-2k。"
                     },
                     "tls_verify": {
                         "description": "TLS证书验证",

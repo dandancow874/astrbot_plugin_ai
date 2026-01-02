@@ -2149,6 +2149,7 @@ class BigBanana(Star):
                         image_b64_list.append((mime_type, b64_data))
         # 图片去重
         image_urls = list(dict.fromkeys(image_urls))
+        params["__source_image_urls__"] = image_urls
         # 判断图片数量是否满足最小要求
         if len(image_urls) + len(image_b64_list) < min_required_images:
             warn_msg = f"图片数量不足，最少需要 {min_required_images} 张图片，当前仅 {len(image_urls) + len(image_b64_list)} 张"
