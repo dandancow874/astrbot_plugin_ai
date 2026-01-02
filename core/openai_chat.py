@@ -64,6 +64,8 @@ class OpenAIChatProvider(BaseProvider):
             return None
         if not isinstance(data, dict):
             return None
+        if isinstance(data.get("msg"), str) and data["msg"].strip():
+            return data["msg"].strip()
         if isinstance(data.get("message"), str) and data["message"].strip():
             return data["message"].strip()
         err = data.get("error")
@@ -230,6 +232,11 @@ class OpenAIChatProvider(BaseProvider):
                     )
 
             result = response.json()
+            if response.status_code == 200 and isinstance(result, dict):
+                if isinstance(result.get("msg"), str) and str(result.get("code", "")).strip():
+                    msg = result.get("msg", "").strip()
+                    if msg:
+                        return None, 400, f"图片生成失败: {msg}"
             if response.status_code == 200:
                 b64_images, media_urls, full_text = self._collect_media_from_payload(result)
                 if media_urls:
@@ -585,7 +592,7 @@ class OpenAIImagesProvider(BaseProvider):
 
         if prefer_edits:
             return f"{base}/v1/images/edits"
-        return f"{base}/images/generations"
+        return f"{base}/v1/images/generations"
 
     @staticmethod
     def _guess_mime_from_b64(b64_data: str) -> str:

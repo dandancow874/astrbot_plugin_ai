@@ -2242,6 +2242,55 @@ class BigBanana(Star):
     ) -> tuple[list[tuple[str, str]] | None, str | None]:
         """提供商调度器"""
         err = None
+
+        async def _try_grsai_images_fallback(
+            provider: ProviderConfig,
+        ) -> tuple[list[tuple[str, str]] | None, str | None]:
+            if provider.api_type != "OpenAI_Chat":
+                return None, None
+            api_url = (provider.api_url or "").strip()
+            if "grsaiapi.com" not in api_url.lower():
+                return None, None
+
+            images_provider = self.provider_map.get("OpenAI_Images")
+            if images_provider is None:
+                provider_cls = BaseProvider.get_provider_class("OpenAI_Images")
+                if provider_cls is None:
+                    return None, None
+                images_provider = provider_cls(
+                    config=self.conf,
+                    common_config=self.common_config,
+                    prompt_config=self.prompt_config,
+                    session=self.http_manager._get_curl_session(),
+                    downloader=self.downloader,
+                    aiohttp_session=self.http_manager._get_aiohttp_session(),
+                )
+                self.provider_map["OpenAI_Images"] = images_provider
+
+            images_api_url = api_url
+            if "/v1/chat/completions" in images_api_url:
+                root = images_api_url.split("/v1/chat/completions", 1)[0].rstrip("/")
+                images_api_url = f"{root}/v1"
+            elif images_api_url.endswith("/chat/completions"):
+                root = images_api_url[: -len("/chat/completions")].rstrip("/")
+                images_api_url = f"{root}/v1"
+
+            fallback_provider = ProviderConfig(
+                name=f"{provider.name}_images",
+                enabled=provider.enabled,
+                api_type="OpenAI_Images",
+                keys=provider.keys,
+                api_url=images_api_url,
+                model=provider.model,
+                stream=False,
+                tls_verify=provider.tls_verify,
+                impersonate=provider.impersonate,
+            )
+            return await images_provider.generate_images(
+                provider_config=fallback_provider,
+                params=params,
+                image_b64_list=image_b64_list,
+            )
         
         # 1. 确定使用的模型
         model_name = params.get("__model_name__")
@@ -2325,9 +2374,38 @@ class BigBanana(Star):
                 params=params,
                 image_b64_list=image_b64_list,
             )
+            if (
+                not images_result
+                and isinstance(err, str)
+                and (
+                    "不存在该模型" in err
+                    or "响应中未包含图片数据" in err
+                    or "响应中未包含媒体数据" in err
+                )
+            ):
+                fallback_images, fallback_err = await _try_grsai_images_fallback(provider)
+                if fallback_images:
+                    logger.info(f"模型 {target_model.name} - {provider.name} 图片生成成功")
+                    return fallback_images, None
+                if isinstance(fallback_err, str) and fallback_err.strip():
+                    err = fallback_err
             if images_result:
                 logger.info(f"模型 {target_model.name} - {provider.name} 图片生成成功")
                 return images_result, None
+
+            if isinstance(err, str) and err.strip():
+                prev = params.get("__best_err__")
+                if not isinstance(prev, str) or not prev.strip():
+                    params["__best_err__"] = err
+                else:
+                    prev_is_key_missing = "未配置 API Key" in prev
+                    cur_is_key_missing = "未配置 API Key" in err
+                    if prev_is_key_missing and not cur_is_key_missing:
+                        params["__best_err__"] = err
+                    elif not prev_is_key_missing and cur_is_key_missing:
+                        pass
+                    else:
+                        params["__best_err__"] = err
             
             # 如果不是最后一个提供商，且配置了重试逻辑（隐含在列表顺序中），则继续
             if i < len(candidate_providers) - 1:
@@ -2404,6 +2482,9 @@ class BigBanana(Star):
                         err = fallback_err
 
         # 处理错误信息
+        best_err = params.get("__best_err__")
+        if isinstance(best_err, str) and best_err.strip():
+            err = best_err
         if not err:
             err = "所有提供商均生成失败，请检查日志。"
         return None, err
