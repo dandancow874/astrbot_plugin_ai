@@ -22,7 +22,10 @@ class OpenAIChatProvider(BaseProvider):
 
     @staticmethod
     def _is_grsai(api_url: object) -> bool:
-        return isinstance(api_url, str) and "grsaiapi.com" in api_url.lower()
+        if not isinstance(api_url, str):
+            return False
+        u = api_url.lower()
+        return "grsai" in u or "dakka.com.cn" in u
 
     @staticmethod
     def _resolve_grsai_draw_url(api_url: str) -> str:

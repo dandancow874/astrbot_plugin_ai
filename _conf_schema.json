@@ -164,8 +164,8 @@
                     "api_url": {
                         "description": "OpenAI兼容 Base URL",
                         "type": "string",
-                        "default": "https://grsaiapi.com",
-                        "hint": "推荐填 Base URL，例如 https://grsaiapi.com。插件会将 nano-banana* 模型请求路由到 /v1/draw/nano-banana。也可填 /v1/chat/completions，仍可自动识别。"
+                        "default": "https://grsai.dakka.com.cn",
+                        "hint": "推荐填 Base URL，例如 https://grsai.dakka.com.cn。插件会将 nano-banana* 模型请求路由到 /v1/draw/nano-banana。"
                     },
                     "api_key": {
                         "description": "API Key",
@@ -216,8 +216,8 @@
                     "api_url": {
                         "description": "OpenAI兼容 Base URL",
                         "type": "string",
-                        "default": "https://ai.t8star.cn",
-                        "hint": "留空表示不启用备用。备用一般填 https://ai.t8star.cn（OpenAI Images 兼容）。"
+                        "default": "https://grsai.dakka.com.cn",
+                        "hint": "推荐填 Base URL，例如 https://grsai.dakka.com.cn。图生图会自动补全为 /v1/images/edits，文生图会自动补全为 /images/generations。也可直接填完整 images URL。"
                     },
                     "api_key": {
                         "description": "API Key",
