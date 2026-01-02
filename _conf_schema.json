@@ -145,6 +145,58 @@
                         "description": "API Base 预设",
                         "type": "string",
                         "options": ["zhenzhen", "ip", "hk", "us"],
+                        "default": "zhenzhen"
+                    },
+                    "custom_ip": {
+                        "description": "自定义 Base URL",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "api_type": {
+                        "description": "接口类型",
+                        "type": "string",
+                        "options": ["OpenAI_Images"],
+                        "default": "OpenAI_Images",
+                        "hint": "留空表示不启用备用。"
+                    },
+                    "api_url": {
+                        "description": "OpenAI兼容 Base URL",
+                        "type": "string",
+                        "default": "",
+                        "hint": "留空表示不启用备用。推荐填 Base URL，例如 https://ai.t8star.cn。图生图会自动补全为 /v1/images/edits，文生图会自动补全为 /images/generations。"
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "留空表示不启用备用。"
+                    },
+                    "model": {
+                        "description": "模型名称",
+                        "type": "string",
+                        "default": "",
+                        "hint": "留空使用默认模型名。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
+                    }
+
+            },
+            "secondary": {
+                "description": "备用提供商",
+                "type": "object",
+                "items": {
+                    "api_base": {
+                        "description": "API Base 预设",
+                        "type": "string",
+                        "options": ["zhenzhen", "ip", "hk", "us"],
                         "default": "zhenzhen",
                         "hint": "zhenzhen=ai.t8star.cn；ip=自定义；hk/us=预设站点。"
                     },
@@ -190,57 +242,6 @@
                         "default": "chrome131"
                     }
                 }
-            },
-            "secondary": {
-                "description": "备用提供商",
-                "type": "object",
-                "items": {
-                    "api_base": {
-                        "description": "API Base 预设",
-                        "type": "string",
-                        "options": ["zhenzhen", "ip", "hk", "us"],
-                        "default": "zhenzhen"
-                    },
-                    "custom_ip": {
-                        "description": "自定义 Base URL",
-                        "type": "string",
-                        "default": ""
-                    },
-                    "api_type": {
-                        "description": "接口类型",
-                        "type": "string",
-                        "options": ["OpenAI_Images"],
-                        "default": "OpenAI_Images",
-                        "hint": "留空表示不启用备用。"
-                    },
-                    "api_url": {
-                        "description": "OpenAI兼容 Base URL",
-                        "type": "string",
-                        "default": "",
-                        "hint": "留空表示不启用备用。推荐填 Base URL，例如 https://ai.t8star.cn。图生图会自动补全为 /v1/images/edits，文生图会自动补全为 /images/generations。"
-                    },
-                    "api_key": {
-                        "description": "API Key",
-                        "type": "string",
-                        "default": "",
-                        "hint": "留空表示不启用备用。"
-                    },
-                    "model": {
-                        "description": "模型名称",
-                        "type": "string",
-                        "default": "",
-                        "hint": "留空使用默认模型名。"
-                    },
-                    "tls_verify": {
-                        "description": "TLS证书验证",
-                        "type": "bool",
-                        "default": true
-                    },
-                    "impersonate": {
-                        "description": "TLS/UA 指纹伪装",
-                        "type": "string",
-                        "default": "chrome131"
-                    }
                 }
             }
         }

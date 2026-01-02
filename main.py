@@ -383,7 +383,15 @@ class BigBanana(Star):
         self.conf = config
         # 初始化提示词配置
         self.init_prompts()
-        self.user_selected_provider_model: dict[str, str] = {}
+        persisted = self.conf.get("user_selected_provider_model", {})
+        if isinstance(persisted, dict):
+            self.user_selected_provider_model = {
+                str(k): str(v)
+                for k, v in persisted.items()
+                if str(k).strip() and isinstance(v, str) and v.strip()
+            }
+        else:
+            self.user_selected_provider_model = {}
         # 白名单配置
         self.whitelist_config = self.conf.get("whitelist_config", {})
         # 群组白名单，列表是引用类型
@@ -1059,6 +1067,8 @@ class BigBanana(Star):
             return
 
         self.user_selected_provider_model[event.get_sender_id()] = chosen
+        self.conf["user_selected_provider_model"] = dict(self.user_selected_provider_model)
+        self.conf.save_config()
         yield event.plain_result(f"✅ 已切换模型：{key}（{chosen}）")
 
     # === 管理指令：白名单管理 ===
@@ -2276,7 +2286,10 @@ class BigBanana(Star):
             
             # 如果不是最后一个提供商，且配置了重试逻辑（隐含在列表顺序中），则继续
             if i < len(candidate_providers) - 1:
-                logger.warning(f"{provider.name} 生成图片失败，尝试使用下一个提供商...")
+                logger.warning(
+                    f"{provider.name} 生成图片失败，尝试使用下一个提供商... "
+                    f"(api_type={provider.api_type}, api_url={provider.api_url}, model={provider.model}, err={err})"
+                )
 
         if (
             allow_fallback

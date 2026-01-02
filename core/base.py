@@ -97,6 +97,10 @@ class BaseProvider(ABC):
                     )
                 if images_result:
                     return images_result, None
+                if status == 404 and isinstance(err, str) and err.strip():
+                    api_url = (provider_config.api_url or "").strip()
+                    if api_url and api_url not in err:
+                        err = f"{err.strip()}（{api_url}）"
                 if self.def_common_config.smart_retry and not self.should_retry(status):
                     break
                 logger.warning(
