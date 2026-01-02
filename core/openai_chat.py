@@ -6,7 +6,12 @@ import time
 from urllib.parse import urlparse
 
 from aiohttp import ClientTimeout
-from curl_cffi import CurlMime
+try:
+    from curl_cffi import CurlMime, CurlHttpVersion
+except Exception:
+    from curl_cffi import CurlMime
+
+    CurlHttpVersion = None
 from curl_cffi.requests.exceptions import Timeout
 
 from astrbot.api import logger
@@ -112,6 +117,8 @@ class OpenAIChatProvider(BaseProvider):
             }
             if impersonate:
                 req_kwargs["impersonate"] = impersonate
+            if CurlHttpVersion is not None:
+                req_kwargs["http_version"] = CurlHttpVersion.V1_1
 
             response = await self.session.post(
                 url=url,
@@ -161,7 +168,7 @@ class OpenAIChatProvider(BaseProvider):
             logger.error(f"[BIG BANANA] 网络请求超时: {e}")
             return None, 408, "图片生成失败：响应超时"
         except Exception as e:
-            logger.error(f"[BIG BANANA] 请求错误: {e}")
+            logger.error(f"[BIG BANANA] 请求错误: {e}, url={url}")
             return None, None, "图片生成失败：程序错误"
 
     def _extract_media_sources(
@@ -365,6 +372,8 @@ class OpenAIChatProvider(BaseProvider):
             }
             if impersonate:
                 req_kwargs["impersonate"] = impersonate
+            if self._is_grsai(provider_config.api_url) and CurlHttpVersion is not None:
+                req_kwargs["http_version"] = CurlHttpVersion.V1_1
             # 发送请求
             response = await self.session.post(
                 url=provider_config.api_url,
@@ -475,7 +484,7 @@ class OpenAIChatProvider(BaseProvider):
             )
             return None, response.status_code, "图片生成失败：响应内容格式错误"
         except Exception as e:
-            logger.error(f"[BIG BANANA] 请求错误: {e}")
+            logger.error(f"[BIG BANANA] 请求错误: {e}, url={provider_config.api_url}")
             return None, None, "图片生成失败：程序错误"
 
     async def _call_stream_api(
@@ -617,6 +626,8 @@ class OpenAIChatProvider(BaseProvider):
             }
             if impersonate:
                 req_kwargs["impersonate"] = impersonate
+            if self._is_grsai(provider_config.api_url) and CurlHttpVersion is not None:
+                req_kwargs["http_version"] = CurlHttpVersion.V1_1
             async def post_request(use_data: bool):
                 if use_data:
                     payload = json.dumps(openai_context, ensure_ascii=False)
@@ -705,7 +716,7 @@ class OpenAIChatProvider(BaseProvider):
             logger.error(f"[BIG BANANA] 网络请求超时: {e}")
             return None, 408, "图片生成失败：响应超时"
         except Exception as e:
-            logger.error(f"[BIG BANANA] 请求错误: {e}")
+            logger.error(f"[BIG BANANA] 请求错误: {e}, url={provider_config.api_url}")
             return None, None, "图片生成失败：程序错误"
 
     def _build_openai_chat_context(

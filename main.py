@@ -79,6 +79,13 @@ class BigBanana(Star):
     def _normalize_api_url(api_type: str, api_url: str | None) -> str:
         url = (api_url or "").strip()
         url = url.strip("`'\" \t\r\n").strip()
+        if url and "grsaiapi.com" in url.lower():
+            url = re.sub(r"grsaiapi\.com", "grsai.dakka.com.cn", url, flags=re.I)
+        if url and not re.match(r"^https?://", url, flags=re.I):
+            raw_no_scheme = url.lstrip("/")
+            lowered_no_scheme = raw_no_scheme.lower()
+            if lowered_no_scheme.startswith("grsai.dakka.com.cn") or lowered_no_scheme.startswith("ai.t8star.cn"):
+                url = "https://" + raw_no_scheme
         url = url.rstrip(",，)）】】]}")
         url = url.lstrip("`'\"([{【")
         if api_type == "Gemini":
