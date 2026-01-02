@@ -537,13 +537,13 @@ class BigBanana(Star):
             if not isinstance(primary_conf, dict):
                 primary_conf = {}
 
-            def build_provider_item(conf: dict, suffix: str) -> dict:
+                def build_provider_item(conf: dict, suffix: str) -> dict:
                     api_base_mapping = {
                         "t8star": "https://ai.t8star.cn",
                         "zhenzhen": "https://ai.t8star.cn",
                         "hk": "https://hk-api.gptbest.vip",
                         "us": "https://api.gptbest.vip",
-                        "grsai": "https://grsaiapi.com",
+                        "grsai": "https://grsai.dakka.com.cn",
                     }
                     api_type = conf.get("api_type", None)
                     if not isinstance(api_type, str) or not api_type.strip():
@@ -652,7 +652,8 @@ class BigBanana(Star):
                 other_items: list[dict] = []
                 for item in providers:
                     api_url = str(item.get("api_url", "") or "").strip()
-                    is_grsai = "grsaiapi.com" in api_url.lower()
+                    lowered = api_url.lower()
+                    is_grsai = "grsai" in lowered or "dakka.com.cn" in lowered
                     if is_grsai:
                         item.setdefault("enabled", True)
                         item["api_type"] = "OpenAI_Chat"
@@ -669,7 +670,7 @@ class BigBanana(Star):
                         "enabled": True,
                         "api_type": "OpenAI_Chat",
                         "keys": parse_keys(key),
-                        "api_url": "https://grsaiapi.com",
+                        "api_url": "https://grsai.dakka.com.cn",
                         "model": "nano-banana-pro",
                         "stream": False,
                     }
@@ -718,7 +719,7 @@ class BigBanana(Star):
                 "enabled": True,
                 "api_type": "OpenAI_Chat",
                 "keys": [],
-                "api_url": "https://grsaiapi.com",
+                "api_url": "https://grsai.dakka.com.cn",
                 "model": "nano-banana-pro",
                 "stream": False,
             },
@@ -2262,7 +2263,8 @@ class BigBanana(Star):
             if provider.api_type != "OpenAI_Chat":
                 return None, None
             api_url = (provider.api_url or "").strip()
-            if "grsaiapi.com" not in api_url.lower():
+            lowered = api_url.lower()
+            if "grsai" not in lowered and "dakka.com.cn" not in lowered:
                 return None, None
 
             alias_models: list[str] = []

@@ -146,13 +146,13 @@
                         "type": "string",
                         "options": ["grsai", "zhenzhen", "ip", "hk", "us"],
                         "default": "grsai",
-                        "hint": "grsai=grsaiapi.com；zhenzhen=ai.t8star.cn；ip=自定义；hk/us=预设站点。"
+                        "hint": "grsai=grsai.dakka.com.cn；zhenzhen=ai.t8star.cn；ip=自定义；hk/us=预设站点。"
                     },
                     "custom_ip": {
                         "description": "自定义 Base URL",
                         "type": "string",
                         "default": "",
-                        "hint": "当 api_base=ip 时填写，例如 https://grsaiapi.com 或 https://ai.t8star.cn。"
+                        "hint": "当 api_base=ip 时填写，例如 https://grsai.dakka.com.cn 或 https://ai.t8star.cn。"
                     },
                     "api_type": {
                         "description": "接口类型",

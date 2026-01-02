@@ -410,7 +410,7 @@ class OpenAIChatProvider(BaseProvider):
                 detail = None
                 if isinstance(resp_text, str):
                     detail = self._extract_error_message(resp_text)
-                if "grsaiapi.com" in (provider_config.api_url or "").lower():
+                if self._is_grsai(provider_config.api_url):
                     for alt in self._derive_alt_chat_urls(provider_config.api_url):
                         try:
                             alt_resp = await self.session.post(
