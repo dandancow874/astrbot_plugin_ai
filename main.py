@@ -1883,6 +1883,17 @@ class BigBanana(Star):
             "bnt",
             "bna",
         }
+        if cmd in {"bnn", "bnt", "bna"}:
+            params["__model_name__"] = "nano-banana"
+            if not user_overrode_model and not str(params.get("model", "") or "").strip():
+                nanobanana_conf = self.conf.get("nanobanana_config", {})
+                primary_conf = (
+                    nanobanana_conf.get("primary", {}) if isinstance(nanobanana_conf, dict) else {}
+                )
+                default_model = (
+                    primary_conf.get("model", None) if isinstance(primary_conf, dict) else None
+                )
+                params["model"] = str(default_model).strip() if str(default_model or "").strip() else "nano-banana-pro"
         if is_nanobanana:
             if (
                 self.nanobanana_group_whitelist_enabled
@@ -2340,6 +2351,44 @@ class BigBanana(Star):
                 if model.name == model_name:
                     target_model = model
                     break
+            if not target_model:
+                models_data = self.conf.get("models", [])
+                model_data = None
+                if isinstance(models_data, list):
+                    model_data = next(
+                        (
+                            m
+                            for m in models_data
+                            if isinstance(m, dict) and m.get("name") == model_name
+                        ),
+                        None,
+                    )
+                if isinstance(model_data, dict):
+                    providers_data = model_data.get("providers", [])
+                    providers: list[ProviderConfig] = []
+                    if isinstance(providers_data, list):
+                        for provider_data in providers_data:
+                            if not isinstance(provider_data, dict):
+                                continue
+                            if not provider_data.get("enabled", False):
+                                continue
+                            payload = {
+                                k: v
+                                for k, v in provider_data.items()
+                                if k in ProviderConfig.__annotations__
+                            }
+                            payload.setdefault("keys", [])
+                            payload["api_url"] = self._normalize_api_url(
+                                payload.get("api_type", ""), payload.get("api_url", "")
+                            )
+                            providers.append(ProviderConfig(**payload))
+                    if providers:
+                        target_model = ModelConfig(
+                            name=str(model_data.get("name", model_name)),
+                            triggers=model_data.get("triggers", []),
+                            providers=providers,
+                            enabled=bool(model_data.get("enabled", True)),
+                        )
         
         # 如果未找到指定模型（或未指定），使用第一个启用的模型作为默认
         if not target_model and self.models:
