@@ -76,6 +76,83 @@ class OpenAIChatProvider(BaseProvider):
                 return first["msg"].strip()
         return None
 
+    def _collect_media_from_payload(
+        self, payload: object
+    ) -> tuple[list[tuple[str, str]], list[str], str]:
+        b64_images: list[tuple[str, str]] = []
+        media_urls: list[str] = []
+        text_parts: list[str] = []
+
+        if not isinstance(payload, dict):
+            return b64_images, media_urls, ""
+
+        data = payload.get("data")
+        if isinstance(data, dict):
+            data = [data]
+        if isinstance(data, list) and data:
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                b64 = item.get("b64_json")
+                if isinstance(b64, str) and b64.strip():
+                    b64_images.append(("image/png", b64))
+                    continue
+                url = item.get("url")
+                if isinstance(url, str) and url.strip():
+                    media_urls.append(url.strip())
+
+        choices = payload.get("choices")
+        if isinstance(choices, list):
+            for choice in choices:
+                if not isinstance(choice, dict):
+                    continue
+                msg = choice.get("message")
+                if not isinstance(msg, dict):
+                    continue
+                content = msg.get("content")
+                if isinstance(content, str) and content.strip():
+                    text_parts.append(content)
+                    continue
+                if isinstance(content, list):
+                    for part in content:
+                        if not isinstance(part, dict):
+                            continue
+                        ptype = str(part.get("type") or "").strip()
+                        if ptype in {"text", "output_text"}:
+                            txt = part.get("text")
+                            if isinstance(txt, str) and txt.strip():
+                                text_parts.append(txt)
+                            continue
+                        if ptype == "image_url":
+                            img = part.get("image_url")
+                            if isinstance(img, dict):
+                                url = img.get("url")
+                            else:
+                                url = None
+                            if isinstance(url, str) and url.strip():
+                                media_urls.append(url.strip())
+                            continue
+
+                        txt = part.get("text")
+                        if isinstance(txt, str) and txt.strip():
+                            text_parts.append(txt)
+                        url = None
+                        img = part.get("image_url")
+                        if isinstance(img, dict):
+                            url = img.get("url")
+                        if isinstance(url, str) and url.strip():
+                            media_urls.append(url.strip())
+
+        full_text = "\n".join(t for t in text_parts if isinstance(t, str) and t.strip())
+        b64_from_text, urls_from_text = self._extract_media_sources(full_text)
+        if b64_from_text:
+            b64_images.extend(b64_from_text)
+        if urls_from_text:
+            media_urls.extend(urls_from_text)
+
+        media_urls = list(dict.fromkeys([u for u in media_urls if isinstance(u, str) and u.strip()]))
+        return b64_images, media_urls, full_text
+
     async def _call_api(
         self,
         provider_config: ProviderConfig,
@@ -121,60 +198,52 @@ class OpenAIChatProvider(BaseProvider):
                 json=openai_context,
                 **req_kwargs,
             )
-            # 响应反序列化
+            resp_text = getattr(response, "text", "")
+            if isinstance(resp_text, str):
+                stripped = resp_text.lstrip()
+                if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
+                    return None, 502, "上游返回HTML，可能是鉴权失败或接口路径错误"
+
             result = response.json()
             if response.status_code == 200:
-                b64_images: list[tuple[str, str]] = []
-                media_urls: list[str] = []
-                for item in result.get("choices", []):
-                    # 检查 finish_reason 状态
-                    finish_reason = item.get("finish_reason", "")
-                    if finish_reason == "stop":
-                        content = item.get("message", {}).get("content", "")
-                        b64_part, url_part = self._extract_media_sources(content)
-                        if b64_part:
-                            b64_images.extend(b64_part)
-                        if url_part:
-                            media_urls.extend(url_part)
-                    else:
-                        logger.warning(
-                            f"[BIG BANANA] 图片生成失败, 响应内容: {response.text[:1024]}"
-                        )
-                        return None, 200, f"图片生成失败: {finish_reason}"
-                # 最后再检查是否有图片数据
-                if not media_urls and not b64_images:
-                    logger.warning(
-                        f"[BIG BANANA] 请求成功，但未返回图片数据, 响应内容: {response.text[:1024]}"
-                    )
-                    return None, 200, "响应中未包含图片数据"
-                # 下载媒体并转换为 base64
+                b64_images, media_urls, full_text = self._collect_media_from_payload(result)
                 if media_urls:
                     b64_images += await self.downloader.fetch_media(media_urls)
+                b64_images = [(mime, b64) for mime, b64 in b64_images if b64]
                 if not b64_images:
-                    return None, 200, "媒体下载失败"
+                    if isinstance(full_text, str) and full_text.strip():
+                        logger.warning(
+                            f"[BIG BANANA] 请求成功，但未返回媒体数据, 响应内容: {resp_text[:1024]}"
+                        )
+                        return None, 200, full_text.strip()
+                    logger.warning(
+                        f"[BIG BANANA] 请求成功，但未返回图片数据, 响应内容: {resp_text[:1024]}"
+                    )
+                    return None, 200, "响应中未包含图片数据"
                 return b64_images, 200, None
-            else:
-                logger.error(
-                    f"[BIG BANANA] 图片生成失败，状态码: {response.status_code}, 响应内容: {response.text[:1024]}"
-                )
-                detail = None
-                if isinstance(result, dict):
-                    if isinstance(result.get("message"), str):
-                        detail = result.get("message")
-                    err_obj = result.get("error")
-                    if not detail and isinstance(err_obj, dict) and isinstance(err_obj.get("message"), str):
-                        detail = err_obj.get("message")
-                return (
-                    None,
-                    response.status_code,
-                    f"图片生成失败: {detail}" if detail else f"图片生成失败: 状态码 {response.status_code}",
-                )
+
+            logger.error(
+                f"[BIG BANANA] 图片生成失败，状态码: {response.status_code}, 响应内容: {resp_text[:1024]}"
+            )
+            detail = self._extract_error_message(resp_text if isinstance(resp_text, str) else "")
+            return (
+                None,
+                response.status_code,
+                f"图片生成失败: {detail}" if detail else f"图片生成失败: 状态码 {response.status_code}",
+            )
         except Timeout as e:
             logger.error(f"[BIG BANANA] 网络请求超时: {e}")
             return None, 408, "图片生成失败：响应超时"
         except json.JSONDecodeError as e:
+            resp_text = getattr(response, "text", "")
+            text_preview = resp_text[:1024] if isinstance(resp_text, str) else ""
+            stripped = text_preview.lstrip()
+            if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
+                return None, response.status_code, "图片生成失败：上游返回HTML，可能是鉴权失败或接口路径错误"
+            if response.status_code == 404:
+                return None, 404, "图片生成失败：API 地址不存在"
             logger.error(
-                f"[BIG BANANA] JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{response.text[:1024]}"
+                f"[BIG BANANA] JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{text_preview}"
             )
             return None, response.status_code, "图片生成失败：响应内容格式错误"
         except Exception as e:
@@ -583,8 +652,15 @@ class OpenAIImagesProvider(BaseProvider):
             logger.error(f"[BIG BANANA] 网络请求超时: {e}")
             return None, 408, "图片生成失败：响应超时"
         except json.JSONDecodeError as e:
+            resp_text = getattr(response, "text", "")
+            text_preview = resp_text[:1024] if isinstance(resp_text, str) else ""
+            stripped = text_preview.lstrip()
+            if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
+                return None, response.status_code, "图片生成失败：上游返回HTML，可能是鉴权失败或接口路径错误"
+            if response.status_code == 404:
+                return None, 404, "图片生成失败：API 地址不存在"
             logger.error(
-                f"[BIG BANANA] JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{response.text[:1024]}"
+                f"[BIG BANANA] JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{text_preview}"
             )
             return None, response.status_code, "图片生成失败：响应内容格式错误"
         except Exception as e:
@@ -785,8 +861,15 @@ class OpenAIImagesProvider(BaseProvider):
             logger.error(f"[BIG BANANA] 网络请求超时: {e}")
             return None, 408, "图片生成失败：响应超时"
         except json.JSONDecodeError as e:
+            resp_text = getattr(response, "text", "")
+            text_preview = resp_text[:1024] if isinstance(resp_text, str) else ""
+            stripped = text_preview.lstrip()
+            if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
+                return None, response.status_code, "图片生成失败：上游返回HTML，可能是鉴权失败或接口路径错误"
+            if response.status_code == 404:
+                return None, 404, "图片生成失败：API 地址不存在"
             logger.error(
-                f"[BIG BANANA] JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{response.text[:1024]}"
+                f"[BIG BANANA] JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{text_preview}"
             )
             return None, response.status_code, "图片生成失败：响应内容格式错误"
         except Exception as e:

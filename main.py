@@ -383,6 +383,7 @@ class BigBanana(Star):
         self.conf = config
         # 初始化提示词配置
         self.init_prompts()
+        self.user_selected_provider_model: dict[str, str] = {}
         # 白名单配置
         self.whitelist_config = self.conf.get("whitelist_config", {})
         # 群组白名单，列表是引用类型
@@ -541,8 +542,11 @@ class BigBanana(Star):
                     if not isinstance(api_type, str) or not api_type.strip():
                         api_type = default_provider_stub.get("api_type")
                     api_type = str(api_type).strip()
-                    if conf_key == "nanobanana_config" and suffix == "主":
-                        api_type = "OpenAI_Images"
+                    if conf_key == "nanobanana_config":
+                        if suffix == "主":
+                            api_type = "OpenAI_Images"
+                        elif suffix == "备" and not str(conf.get("api_type", "") or "").strip():
+                            api_type = "OpenAI_Chat"
 
                     item = dict(default_provider_stub)
                     item["api_type"] = api_type
@@ -1026,6 +1030,36 @@ class BigBanana(Star):
         admin_ids = self.context.get_config().get("admins_id", [])
         # logger.info(f"全局管理员列表：{admin_ids}")
         return event.get_sender_id() in admin_ids
+
+    @filter.command("使用模型切换")
+    async def switch_provider_model_command(
+        self, event: AstrMessageEvent, model_id: str = ""
+    ):
+        raw = (event.message_str or "").strip()
+        if not model_id:
+            tokens = raw.split()
+            if len(tokens) >= 2:
+                model_id = tokens[1].strip()
+
+        model_map = {
+            "1": "gemini-3.0-pro-image-portrait",
+            "2": "gemini-3.0-pro-image-landscape",
+            "3": "nano-banana-pro",
+        }
+        token = str(model_id).strip()
+        key = token[:1] if token else ""
+        if key not in model_map:
+            m = re.search(r"([123])", token)
+            key = m.group(1) if m else ""
+        chosen = model_map.get(key)
+        if not chosen:
+            yield event.plain_result(
+                "❌ 用法：使用模型切换 <1/2/3>\n1：gemini-3.0-pro-image-portrait\n2：gemini-3.0-pro-image-landscape\n3：nano-banana-pro"
+            )
+            return
+
+        self.user_selected_provider_model[event.get_sender_id()] = chosen
+        yield event.plain_result(f"✅ 已切换模型：{key}（{chosen}）")
 
     # === 管理指令：白名单管理 ===
     @filter.command("lm白名单添加", alias={"lmawl"})
@@ -1729,15 +1763,16 @@ class BigBanana(Star):
 
         _, user_params = self.parsing_prompt_params(message_str)
         user_overrode_min_images = "min_images" in user_params
+        user_overrode_model = "model" in user_params
         preset_name = user_params.pop("preset", None)
         user_prompt = user_params.get("prompt", "anything").strip()
 
         if preset_name:
-            preset_key = str(preset_name).strip()
+            preset_key = str(preset_name).strip().strip(",，")
             preset_params = self.prompt_dict.get(preset_key, None)
             if not preset_params and preset_key:
                 for k, v in self.prompt_dict.items():
-                    if isinstance(k, str) and k.strip() == preset_key:
+                    if isinstance(k, str) and k.strip().strip(",，") == preset_key:
                         preset_params = v
                         break
             if not preset_params:
@@ -1766,6 +1801,11 @@ class BigBanana(Star):
             params["prompt"] = final_prompt
         else:
             params.update({k: v for k, v in user_params.items() if k != "prompt"})
+
+        if not user_overrode_model:
+            selected_model = self.user_selected_provider_model.get(event.get_sender_id())
+            if selected_model and (preset_name is not None or "__model_name__" not in params):
+                params.setdefault("model", selected_model)
 
         # 处理预设提示词补充参数preset_append
         if (
@@ -2146,6 +2186,7 @@ class BigBanana(Star):
         # 1. 确定使用的模型
         model_name = params.get("__model_name__")
         target_model = None
+        requested_provider_model = (params.get("model") or "").strip()
         
         if model_name:
             for model in self.models:
@@ -2155,14 +2196,23 @@ class BigBanana(Star):
         
         # 如果未找到指定模型（或未指定），使用第一个启用的模型作为默认
         if not target_model and self.models:
-            preferred_provider_model = "gemini-3.0-pro-image-portrait"
-            for model in self.models:
-                if any(
-                    (p.model or "").strip() == preferred_provider_model
-                    for p in model.providers
-                ):
-                    target_model = model
-                    break
+            if requested_provider_model:
+                for model in self.models:
+                    if any(
+                        (p.model or "").strip() == requested_provider_model
+                        for p in model.providers
+                    ):
+                        target_model = model
+                        break
+            if not target_model:
+                preferred_provider_model = "gemini-3.0-pro-image-portrait"
+                for model in self.models:
+                    if any(
+                        (p.model or "").strip() == preferred_provider_model
+                        for p in model.providers
+                    ):
+                        target_model = model
+                        break
             if not target_model:
                 target_model = self.models[0]
             
@@ -2175,6 +2225,15 @@ class BigBanana(Star):
         # 3. 筛选提供商 (如果 params 指定了 provider)
         target_provider_name = params.get("provider")
         
+        if requested_provider_model and not target_provider_name:
+            filtered_by_model = [
+                p
+                for p in candidate_providers
+                if (p.model or "").strip() == requested_provider_model
+            ]
+            if filtered_by_model:
+                candidate_providers = filtered_by_model
+
         if target_provider_name:
             # 尝试匹配 name
             filtered = [
@@ -2212,8 +2271,8 @@ class BigBanana(Star):
                 logger.warning(f"{provider.name} 生成图片失败，尝试使用下一个提供商...")
 
         if allow_fallback:
-            requested_provider_model = (params.get("model") or candidate_providers[0].model or "").strip()
-            is_video_model = requested_provider_model.startswith("veo_")
+            fallback_probe_model = (params.get("model") or candidate_providers[0].model or "").strip()
+            is_video_model = fallback_probe_model.startswith("veo_")
             is_flow2api = any((p.name or "").strip() == "flow2api" for p in candidate_providers)
             html_like_error = isinstance(err, str) and (
                 "HTML" in err
