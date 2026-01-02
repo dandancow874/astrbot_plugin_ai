@@ -1104,7 +1104,7 @@ class BigBanana(Star):
         # logger.info(f"全局管理员列表：{admin_ids}")
         return event.get_sender_id() in admin_ids
 
-    @filter.command("使用模型切换")
+    @filter.command("模型切换", alias={"使用模型切换"})
     async def switch_provider_model_command(
         self, event: AstrMessageEvent, model_id: str = ""
     ):
@@ -2371,6 +2371,17 @@ class BigBanana(Star):
         target_model = None
         requested_provider_model = (params.get("model") or "").strip()
         
+        if (
+            not model_name
+            and not target_model
+            and requested_provider_model in {"nano-banana-pro", "nano-banana"}
+            and self.models
+        ):
+            for model in self.models:
+                if model.enabled and model.name == "nano-banana":
+                    target_model = model
+                    break
+
         if model_name:
             for model in self.models:
                 if model.name == model_name:
