@@ -78,6 +78,9 @@ class BigBanana(Star):
     @staticmethod
     def _normalize_api_url(api_type: str, api_url: str | None) -> str:
         url = (api_url or "").strip()
+        url = url.strip("`'\" \t\r\n").strip()
+        url = url.rstrip(",，)）】】]}")
+        url = url.lstrip("`'\"([{【")
         if api_type == "Gemini":
             if not url:
                 return DEF_GEMINI_API_URL
@@ -530,15 +533,11 @@ class BigBanana(Star):
 
             enabled = bool(model_conf.get("enabled", True))
 
-            providers = model_conf.get("providers", None)
-            if not isinstance(providers, list) or not providers:
-                provider_list: list[dict] = []
+            primary_conf = model_conf.get("primary", {})
+            if not isinstance(primary_conf, dict):
+                primary_conf = {}
 
-                primary_conf = model_conf.get("primary", {})
-                if not isinstance(primary_conf, dict):
-                    primary_conf = {}
-
-                def build_provider_item(conf: dict, suffix: str) -> dict:
+            def build_provider_item(conf: dict, suffix: str) -> dict:
                     api_base_mapping = {
                         "t8star": "https://ai.t8star.cn",
                         "zhenzhen": "https://ai.t8star.cn",
@@ -552,9 +551,9 @@ class BigBanana(Star):
                     api_type = str(api_type).strip()
                     if conf_key == "nanobanana_config":
                         if suffix == "主":
-                            api_type = "OpenAI_Images"
-                        elif suffix == "备" and not str(conf.get("api_type", "") or "").strip():
                             api_type = "OpenAI_Chat"
+                        elif suffix == "备" and not str(conf.get("api_type", "") or "").strip():
+                            api_type = "OpenAI_Images"
 
                     item = dict(default_provider_stub)
                     item["api_type"] = api_type
@@ -600,6 +599,10 @@ class BigBanana(Star):
                     item["name"] = f"{base_name}_{suffix}"
                     return item
 
+            providers = model_conf.get("providers", None)
+            if not isinstance(providers, list) or not providers:
+                provider_list: list[dict] = []
+
                 primary_data = build_provider_item(primary_conf, "主")
                 provider_list.append(primary_data)
 
@@ -616,9 +619,9 @@ class BigBanana(Star):
                     or str(secondary_key).strip()
                     or str(secondary_model).strip()
                 ):
-                    secondary_url = "https://grsaiapi.com"
-                    secondary_api_type = "OpenAI_Chat"
-                    secondary_model = "nano-banana-pro"
+                    secondary_url = "https://ai.t8star.cn"
+                    secondary_api_type = "OpenAI_Images"
+                    secondary_model = "nano-banana-2-2k"
                 if (
                     str(secondary_api_type).strip() == "Vertex_AI_Anonymous"
                     or str(secondary_url).strip()
@@ -637,6 +640,48 @@ class BigBanana(Star):
                     provider_list.append(secondary_data)
 
                 providers = provider_list
+
+            if conf_key == "nanobanana_config" and isinstance(providers, list) and providers:
+                cleaned: list[dict] = []
+                for item in providers:
+                    if isinstance(item, dict):
+                        cleaned.append(item)
+                providers = cleaned
+
+                grsai_items: list[dict] = []
+                other_items: list[dict] = []
+                for item in providers:
+                    api_url = str(item.get("api_url", "") or "").strip()
+                    is_grsai = "grsaiapi.com" in api_url.lower()
+                    if is_grsai:
+                        item.setdefault("enabled", True)
+                        item["api_type"] = "OpenAI_Chat"
+                        if not str(item.get("model", "") or "").strip():
+                            item["model"] = "nano-banana-pro"
+                        grsai_items.append(item)
+                    else:
+                        other_items.append(item)
+
+                if not grsai_items:
+                    key = primary_conf.get("api_key", model_conf.get("api_key", ""))
+                    injected = {
+                        "name": f"{default_provider_stub.get('name', name)}_主",
+                        "enabled": True,
+                        "api_type": "OpenAI_Chat",
+                        "keys": parse_keys(key),
+                        "api_url": "https://grsaiapi.com",
+                        "model": "nano-banana-pro",
+                        "stream": False,
+                    }
+                    tls_verify = primary_conf.get("tls_verify", None)
+                    if isinstance(tls_verify, bool):
+                        injected["tls_verify"] = tls_verify
+                    impersonate = primary_conf.get("impersonate", None)
+                    if isinstance(impersonate, str) and impersonate.strip():
+                        injected["impersonate"] = impersonate.strip()
+                    grsai_items.append(injected)
+
+                providers = grsai_items + other_items
 
             triggers = default_triggers
 
@@ -671,10 +716,10 @@ class BigBanana(Star):
             default_provider_stub={
                 "name": "nano-banana账号",
                 "enabled": True,
-                "api_type": "OpenAI_Images",
+                "api_type": "OpenAI_Chat",
                 "keys": [],
-                "api_url": "https://ai.t8star.cn",
-                "model": "nano-banana-2-2k",
+                "api_url": "https://grsaiapi.com",
+                "model": "nano-banana-pro",
                 "stream": False,
             },
             insert_index=0,
