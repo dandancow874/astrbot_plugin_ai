@@ -201,8 +201,13 @@ class OpenAIChatProvider(BaseProvider):
             resp_text = getattr(response, "text", "")
             if isinstance(resp_text, str):
                 stripped = resp_text.lstrip()
-                if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
-                    return None, 502, "上游返回HTML，可能是鉴权失败或接口路径错误"
+                lowered = stripped.lower()
+                if lowered.startswith("<!doctype html") or lowered.startswith("<html") or "<html" in lowered:
+                    return (
+                        None,
+                        502,
+                        f"上游返回HTML，可能是鉴权失败或接口路径错误（{provider_config.api_url}）",
+                    )
 
             result = response.json()
             if response.status_code == 200:
@@ -238,10 +243,15 @@ class OpenAIChatProvider(BaseProvider):
             resp_text = getattr(response, "text", "")
             text_preview = resp_text[:1024] if isinstance(resp_text, str) else ""
             stripped = text_preview.lstrip()
-            if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
-                return None, response.status_code, "图片生成失败：上游返回HTML，可能是鉴权失败或接口路径错误"
+            lowered = stripped.lower()
+            if lowered.startswith("<!doctype html") or lowered.startswith("<html") or "<html" in lowered:
+                return (
+                    None,
+                    response.status_code,
+                    f"图片生成失败：上游返回HTML，可能是鉴权失败或接口路径错误（{provider_config.api_url}）",
+                )
             if response.status_code == 404:
-                return None, 404, "图片生成失败：API 地址不存在"
+                return None, 404, f"图片生成失败：API 地址不存在（{provider_config.api_url}）"
             logger.error(
                 f"[BIG BANANA] JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{text_preview}"
             )
@@ -299,8 +309,17 @@ class OpenAIChatProvider(BaseProvider):
                     result = await resp.text()
                     if resp.status == 200:
                         stripped = (result or "").lstrip()
-                        if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
-                            return None, 502, "上游返回HTML，可能是鉴权失败或接口路径错误"
+                        lowered = stripped.lower()
+                        if (
+                            lowered.startswith("<!doctype html")
+                            or lowered.startswith("<html")
+                            or "<html" in lowered
+                        ):
+                            return (
+                                None,
+                                502,
+                                f"上游返回HTML，可能是鉴权失败或接口路径错误（{provider_config.api_url}）",
+                            )
                         reasoning_content = ""
                         content_buf_parts: list[str] = []
                         reasoning_buf_parts: list[str] = []
@@ -655,10 +674,15 @@ class OpenAIImagesProvider(BaseProvider):
             resp_text = getattr(response, "text", "")
             text_preview = resp_text[:1024] if isinstance(resp_text, str) else ""
             stripped = text_preview.lstrip()
-            if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
-                return None, response.status_code, "图片生成失败：上游返回HTML，可能是鉴权失败或接口路径错误"
+            lowered = stripped.lower()
+            if lowered.startswith("<!doctype html") or lowered.startswith("<html") or "<html" in lowered:
+                return (
+                    None,
+                    response.status_code,
+                    f"图片生成失败：上游返回HTML，可能是鉴权失败或接口路径错误（{provider_config.api_url}）",
+                )
             if response.status_code == 404:
-                return None, 404, "图片生成失败：API 地址不存在"
+                return None, 404, f"图片生成失败：API 地址不存在（{provider_config.api_url}）"
             logger.error(
                 f"[BIG BANANA] JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{text_preview}"
             )
