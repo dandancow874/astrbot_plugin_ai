@@ -1764,6 +1764,7 @@ class BigBanana(Star):
         _, user_params = self.parsing_prompt_params(message_str)
         user_overrode_min_images = "min_images" in user_params
         user_overrode_model = "model" in user_params
+        params["__user_overrode_model__"] = user_overrode_model
         preset_name = user_params.pop("preset", None)
         user_prompt = user_params.get("prompt", "anything").strip()
 
@@ -1953,10 +1954,14 @@ class BigBanana(Star):
         try:
             results, err_msg = await task
             if not results or err_msg:
+                if isinstance(err_msg, str) and err_msg.strip().startswith("图片生成失败"):
+                    err_text = err_msg.strip()
+                else:
+                    err_text = f"图片生成失败：{err_msg}"
                 yield event.chain_result(
                     [
                         Comp.Reply(id=event.message_obj.message_id),
-                        Comp.Plain(f"❌ 图片生成失败：{err_msg}"),
+                        Comp.Plain(f"❌ {err_text}"),
                     ]
                 )
                 return
@@ -2220,11 +2225,13 @@ class BigBanana(Star):
             return None, "未配置任何模型。"
 
         # 2. 获取该模型的提供商列表
-        candidate_providers = target_model.providers
+        all_candidate_providers = target_model.providers
+        candidate_providers = all_candidate_providers
         
         # 3. 筛选提供商 (如果 params 指定了 provider)
         target_provider_name = params.get("provider")
         
+        filtered_by_model_applied = False
         if requested_provider_model and not target_provider_name:
             filtered_by_model = [
                 p
@@ -2233,6 +2240,7 @@ class BigBanana(Star):
             ]
             if filtered_by_model:
                 candidate_providers = filtered_by_model
+                filtered_by_model_applied = True
 
         if target_provider_name:
             # 尝试匹配 name
@@ -2269,6 +2277,30 @@ class BigBanana(Star):
             # 如果不是最后一个提供商，且配置了重试逻辑（隐含在列表顺序中），则继续
             if i < len(candidate_providers) - 1:
                 logger.warning(f"{provider.name} 生成图片失败，尝试使用下一个提供商...")
+
+        if (
+            allow_fallback
+            and filtered_by_model_applied
+            and not params.get("__user_overrode_model__", False)
+        ):
+            remaining = [p for p in all_candidate_providers if p not in candidate_providers]
+            if remaining:
+                fallback_params = params.copy()
+                fallback_params.pop("model", None)
+                fallback_params.pop("__user_overrode_model__", None)
+                for i, provider in enumerate(remaining):
+                    if provider.api_type not in self.provider_map:
+                        continue
+                    images_result, err = await self.provider_map[
+                        provider.api_type
+                    ].generate_images(
+                        provider_config=provider,
+                        params=fallback_params,
+                        image_b64_list=image_b64_list,
+                    )
+                    if images_result:
+                        logger.info(f"模型 {target_model.name} - {provider.name} 图片生成成功")
+                        return images_result, None
 
         if allow_fallback:
             fallback_probe_model = (params.get("model") or candidate_providers[0].model or "").strip()

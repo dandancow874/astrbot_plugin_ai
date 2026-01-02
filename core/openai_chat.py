@@ -153,6 +153,26 @@ class OpenAIChatProvider(BaseProvider):
         media_urls = list(dict.fromkeys([u for u in media_urls if isinstance(u, str) and u.strip()]))
         return b64_images, media_urls, full_text
 
+    @staticmethod
+    def _derive_alt_chat_urls(api_url: str) -> list[str]:
+        url = (api_url or "").strip()
+        if not url:
+            return []
+        base = url.rstrip("/")
+        candidates: list[str] = []
+        candidates.append(f"{base}/")
+        if "/v1/chat/completions" in base:
+            root = base.split("/v1/chat/completions", 1)[0]
+            candidates.extend(
+                [
+                    f"{root}/chat/completions",
+                    f"{root}/api/v1/chat/completions",
+                    f"{root}/openai/v1/chat/completions",
+                    f"{root}/v1/openai/chat/completions",
+                ]
+            )
+        return [c for c in candidates if c and c != api_url]
+
     async def _call_api(
         self,
         provider_config: ProviderConfig,
@@ -226,6 +246,36 @@ class OpenAIChatProvider(BaseProvider):
                     )
                     return None, 200, "响应中未包含图片数据"
                 return b64_images, 200, None
+
+            if response.status_code == 404:
+                if "grsaiapi.com" in (provider_config.api_url or "").lower():
+                    for alt in self._derive_alt_chat_urls(provider_config.api_url):
+                        try:
+                            alt_resp = await self.session.post(
+                                url=alt,
+                                headers=headers,
+                                json=openai_context,
+                                **req_kwargs,
+                            )
+                            alt_text = getattr(alt_resp, "text", "")
+                            if isinstance(alt_text, str):
+                                stripped = alt_text.lstrip().lower()
+                                if stripped.startswith("<!doctype html") or stripped.startswith("<html") or "<html" in stripped:
+                                    continue
+                            alt_result = alt_resp.json()
+                            if alt_resp.status_code == 200:
+                                b64_images, media_urls, full_text = self._collect_media_from_payload(alt_result)
+                                if media_urls:
+                                    b64_images += await self.downloader.fetch_media(media_urls)
+                                b64_images = [(mime, b64) for mime, b64 in b64_images if b64]
+                                if b64_images:
+                                    return b64_images, 200, None
+                                if isinstance(full_text, str) and full_text.strip():
+                                    return None, 200, full_text.strip()
+                                return None, 200, "响应中未包含图片数据"
+                        except Exception:
+                            continue
+                return None, 404, f"图片生成失败：API 地址不存在（{provider_config.api_url}）"
 
             logger.error(
                 f"[BIG BANANA] 图片生成失败，状态码: {response.status_code}, 响应内容: {resp_text[:1024]}"
