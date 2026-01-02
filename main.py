@@ -2295,6 +2295,7 @@ class BigBanana(Star):
                 "不支持的模型" in last_err or "unsupported model" in last_err.lower()
             ):
                 if cur_model == "nano-banana-pro":
+                    alias_models.append("nano-banana")
                     alias_models.append("gemini-3-pro-image-preview")
 
             if alias_models:

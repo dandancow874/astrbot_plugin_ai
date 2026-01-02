@@ -75,6 +75,8 @@ class OpenAIChatProvider(BaseProvider):
             "Content-Type": "application/json",
         }
         model = (params.get("model") or provider_config.model or "").strip()
+        if model == "nano-banana-pro":
+            model = "nano-banana"
         prompt = params.get("prompt", "anything")
         urls = params.get("__source_image_urls__")
         if not isinstance(urls, list):
