@@ -2503,11 +2503,17 @@ class BigBanana(Star):
                     aiohttp_session=self.http_manager._get_aiohttp_session(),
                 )
                 
-            images_result, err = await self.provider_map[
-                provider.api_type
-            ].generate_images(
+            call_params = params
+            if (
+                provider.api_type == "OpenAI_Chat"
+                and ("grsai" in (provider.api_url or "").lower() or "dakka.com.cn" in (provider.api_url or "").lower())
+                and str(params.get("model", "") or "").strip() == "nano-banana-pro"
+            ):
+                call_params = dict(params)
+                call_params["model"] = "nano-banana"
+            images_result, err = await self.provider_map[provider.api_type].generate_images(
                 provider_config=provider,
-                params=params,
+                params=call_params,
                 image_b64_list=image_b64_list,
             )
             if (

@@ -76,6 +76,7 @@ class OpenAIChatProvider(BaseProvider):
         }
         model = (params.get("model") or provider_config.model or "").strip()
         if model == "nano-banana-pro":
+            logger.info("[BIG BANANA] GrsAI 模型别名: nano-banana-pro -> nano-banana")
             model = "nano-banana"
         prompt = params.get("prompt", "anything")
         urls = params.get("__source_image_urls__")
@@ -341,6 +342,14 @@ class OpenAIChatProvider(BaseProvider):
         if self._is_grsai(provider_config.api_url):
             model = (params.get("model") or provider_config.model or "").strip()
             if model.startswith("nano-banana"):
+                if model == "nano-banana-pro":
+                    patched_params = dict(params)
+                    patched_params["model"] = "nano-banana"
+                    return await self._call_grsai_draw_api(
+                        provider_config=provider_config,
+                        api_key=api_key,
+                        params=patched_params,
+                    )
                 return await self._call_grsai_draw_api(
                     provider_config=provider_config,
                     api_key=api_key,
@@ -502,6 +511,14 @@ class OpenAIChatProvider(BaseProvider):
         if self._is_grsai(provider_config.api_url):
             model = (params.get("model") or provider_config.model or "").strip()
             if model.startswith("nano-banana"):
+                if model == "nano-banana-pro":
+                    patched_params = dict(params)
+                    patched_params["model"] = "nano-banana"
+                    return await self._call_grsai_draw_api(
+                        provider_config=provider_config,
+                        api_key=api_key,
+                        params=patched_params,
+                    )
                 return await self._call_grsai_draw_api(
                     provider_config=provider_config,
                     api_key=api_key,
