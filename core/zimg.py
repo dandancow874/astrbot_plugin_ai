@@ -42,7 +42,9 @@ class ZImageProvider(OpenAIImagesProvider):
         size = self._map_image_size(params.get("image_size"), params.get("aspect_ratio"))
         if not size:
             size = "1024x1024"
-            
+        
+        logger.info(f"[Z-Image] Calculated resolution: {size} (from input: size={params.get('image_size')}, ar={params.get('aspect_ratio')})")
+
         body = {
             "model": params.get("model", provider_config.model),
             "prompt": prompt,
@@ -171,18 +173,24 @@ class ZImageProvider(OpenAIImagesProvider):
         except Exception:
             return f"{base_w}x{base_h}"
 
-        # Gitee AI / Z-Image-Turbo 专用常用分辨率
+        # Gitee AI / Z-Image-Turbo 专用常用分辨率 (基于 SDXL 最佳实践)
         STANDARD_SIZES = [
             # 1:1
-            (1024, 1024), (512, 512), (2048, 2048),
+            (1024, 1024), (768, 768), (512, 512),
+            (1440, 1440), # 2MP 1:1
+
             # 16:9 / 9:16
-            (1280, 720), (720, 1280),   # 720P (通用)
-            (1920, 1080), (1080, 1920), # FHD (部分模型支持)
+            (1344, 768), (768, 1344),   # SDXL 16:9 标准
+            (1920, 1080), (1080, 1920), # FHD (部分支持)
+            
             # 4:3 / 3:4
-            (1024, 768), (768, 1024),   # 通用 4:3
-            (1152, 896), (896, 1152),   # SDXL 4:3
+            (1152, 896), (896, 1152),   # SDXL 4:3 标准
+            
             # 3:2 / 2:3
-            (1216, 832), (832, 1216),   # SDXL 3:2
+            (1216, 832), (832, 1216),   # SDXL 3:2 标准
+            
+            # 21:9 / 9:21
+            (1536, 640), (640, 1536),   # SDXL 21:9 标准
         ]
 
         target_area = base_w * base_h
@@ -207,12 +215,16 @@ class ZImageProvider(OpenAIImagesProvider):
         if best_size:
             return f"{best_size[0]}x{best_size[1]}"
 
-        # 兜底计算
+        # 兜底计算 (确保 64 对齐)
         import math
         new_h = math.sqrt(target_area / target_ratio)
         new_w = new_h * target_ratio
         
         final_w = int(round(new_w / 64) * 64)
         final_h = int(round(new_h / 64) * 64)
+        
+        # 再次检查是否过大 (Z-Image 限制 4MP，建议 2048 以下)
+        if final_w > 2048: final_w = 2048
+        if final_h > 2048: final_h = 2048
         
         return f"{final_w}x{final_h}"
