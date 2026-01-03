@@ -748,6 +748,12 @@ class OpenAIChatProvider(BaseProvider):
             ],
             "stream": params.get("stream", False),
         }
+        
+        # 注入 aspect_ratio 参数，适配 flow2api 等支持该参数的提供商
+        aspect_ratio = params.get("aspect_ratio")
+        if isinstance(aspect_ratio, str) and aspect_ratio.strip():
+            context["aspect_ratio"] = aspect_ratio.strip()
+            
         return context
 
 
@@ -852,6 +858,11 @@ class OpenAIImagesProvider(BaseProvider):
         mapped_size = self._map_image_size(params.get("image_size"))
         if mapped_size:
             body["size"] = mapped_size
+            
+        # 注入 aspect_ratio 参数
+        aspect_ratio = params.get("aspect_ratio")
+        if isinstance(aspect_ratio, str) and aspect_ratio.strip():
+            body["aspect_ratio"] = aspect_ratio.strip()
 
         try:
             impersonate = (
