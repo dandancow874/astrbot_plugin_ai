@@ -1,16 +1,137 @@
 
 from .openai_chat import OpenAIImagesProvider
+from .data import ProviderConfig
+from astrbot.api import logger
+from curl_cffi.requests.exceptions import Timeout
 
 class ZImageProvider(OpenAIImagesProvider):
     api_type: str = "ZImage_Provider"
+
+    async def _call_api(
+        self,
+        provider_config: ProviderConfig,
+        api_key: str,
+        image_b64_list: list[tuple[str, str]],
+        params: dict,
+    ) -> tuple[list[tuple[str, str]] | None, int | None, str | None]:
+        """
+        Z-Image-Turbo 专用调用逻辑
+        不发送 aspect_ratio 字段，完全依赖 size 字段
+        """
+        # Z-Image 不支持图生图 (edits)，忽略 image_b64_list
+        resolved_url = (provider_config.api_url or "").strip().rstrip("/")
+        if not resolved_url:
+            resolved_url = "https://ai.gitee.com/v1/images/generations"
+
+        prompt = params.get("prompt", "anything")
+        
+        # 使用自定义的 _map_image_size 计算最终分辨率
+        size = self._map_image_size(params.get("image_size"), params.get("aspect_ratio"))
+        if not size:
+            size = "1024x1024"
+            
+        body = {
+            "model": params.get("model", provider_config.model),
+            "prompt": prompt,
+            "n": 1,
+            "size": size,
+            "response_format": "b64_json",
+        }
+        
+        # 允许用户通过 params 传递 extra_body (如 num_inference_steps)
+        # 但过滤掉 aspect_ratio 和其他已处理字段
+        for k, v in params.items():
+            if k not in ["image_size", "aspect_ratio", "prompt", "n", "size", "response_format", "model", "__source_image_urls__"]:
+                body[k] = v
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "X-Failover-Enabled": "true", # 用户建议添加
+        }
+
+        try:
+            impersonate = (
+                provider_config.impersonate.strip()
+                if isinstance(provider_config.impersonate, str)
+                and provider_config.impersonate.strip()
+                else None
+            )
+            verify = (
+                provider_config.tls_verify
+                if isinstance(provider_config.tls_verify, bool)
+                else True
+            )
+            req_kwargs = {
+                "timeout": self.def_common_config.timeout,
+                "proxy": self.def_common_config.proxy,
+                "verify": verify,
+            }
+            if impersonate:
+                req_kwargs["impersonate"] = impersonate
+
+            response = await self.session.post(
+                url=resolved_url,
+                headers=headers,
+                json=body,
+                **req_kwargs,
+            )
+            result = response.json()
+            
+            if response.status_code == 200:
+                b64_images: list[tuple[str, str]] = []
+                images_url: list[str] = []
+                for item in (result.get("data") or []):
+                    if not isinstance(item, dict):
+                        continue
+                    b64 = item.get("b64_json")
+                    if isinstance(b64, str) and b64.strip():
+                        mime = self._guess_mime_from_b64(b64)
+                        b64_images.append((mime, b64))
+                        continue
+                    url = item.get("url")
+                    if isinstance(url, str) and url.strip():
+                        images_url.append(url)
+
+                if images_url:
+                    b64_images += await self.downloader.fetch_images(images_url)
+
+                b64_images = [(mime, b64) for mime, b64 in b64_images if b64]
+                if not b64_images:
+                    logger.warning(
+                        f"[Z-Image] 请求成功，但未返回图片数据, 响应内容: {response.text[:1024]}"
+                    )
+                    return None, 200, "响应中未包含图片数据"
+                return b64_images, 200, None
+
+            logger.error(
+                f"[Z-Image] 图片生成失败，状态码: {response.status_code}, 响应内容: {response.text[:1024]}"
+            )
+            detail = None
+            if isinstance(result, dict):
+                if isinstance(result.get("message"), str):
+                    detail = result.get("message")
+                err_obj = result.get("error")
+                if not detail and isinstance(err_obj, dict) and isinstance(err_obj.get("message"), str):
+                    detail = err_obj.get("message")
+            return None, response.status_code, f"图片生成失败: {detail}" if detail else f"图片生成失败: 状态码 {response.status_code}"
+            
+        except Timeout as e:
+            logger.error(f"[Z-Image] 网络请求超时: {e}")
+            return None, None, "网络请求超时"
+        except Exception as e:
+            logger.error(f"[Z-Image] 未知错误: {e}")
+            return None, None, f"未知错误: {e}"
 
     @staticmethod
     def _map_image_size(image_size: object, aspect_ratio: str | None = None) -> str | None:
         """
         Gitee AI / Z-Image-Turbo 专用分辨率映射
         """
-        if not isinstance(image_size, str):
-            return None
+        # 如果没有指定 image_size，默认为 "1024x1024" (1K) 以便进行 AR 计算
+        if not image_size or not isinstance(image_size, str):
+            image_size = "1024x1024"
+            
         size = image_size.strip().upper()
         
         # 基础分辨率映射 (1:1)
