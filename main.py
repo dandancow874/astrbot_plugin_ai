@@ -2521,8 +2521,15 @@ class BigBanana(Star):
                 provider.api_type == "OpenAI_Chat"
                 and ("grsai" in (provider.api_url or "").lower() or "dakka.com.cn" in (provider.api_url or "").lower())
             ):
-                # 移除之前的强制映射逻辑，允许 nano-banana-pro 直接透传
-                pass
+                # 检查是否为 nano-banana-pro 模型，如果是且未指定 image_size，则强制设置为 2K
+                # 这里的逻辑涵盖了 bnn 命令之外的调用（如预设提示词）
+                current_model = (params_model or provider_model).strip()
+                if current_model == "nano-banana-pro":
+                    if "image_size" not in call_params or not call_params["image_size"]:
+                        # 确保不影响原 params 对象，虽然 call_params 此时是指向 params 的引用
+                        # 如果需要隔离，应该 copy。但这里我们希望这个默认值生效。
+                        call_params["image_size"] = "2K"
+                        logger.info(f"[BIG BANANA] 为 nano-banana-pro 强制设置默认分辨率: 2K")
 
             images_result, err = await self.provider_map[provider.api_type].generate_images(
                 provider_config=provider,
