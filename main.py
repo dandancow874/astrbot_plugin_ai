@@ -1091,6 +1091,8 @@ class BigBanana(Star):
                     elif value.isdigit():
                         params[key] = int(value)
                     else:
+                        if key == "aspect_ratio":
+                            value = value.strip("`'\" \t\r\n,，;；。.!！?？)）]】}、")
                         params[key] = value
                     continue
             filtered.append(token)
@@ -1841,6 +1843,7 @@ class BigBanana(Star):
 
         _, user_params = self.parsing_prompt_params(message_str)
         user_overrode_min_images = "min_images" in user_params
+        user_overrode_image_size = "image_size" in user_params
         user_overrode_model = "model" in user_params
         params["__user_overrode_model__"] = user_overrode_model
         preset_name = user_params.pop("preset", None)
@@ -1900,6 +1903,8 @@ class BigBanana(Star):
 
         if cmd in {"iv1", "iv2"} and not user_overrode_min_images:
             params["min_images"] = 2
+        if cmd == "zimg" and not user_overrode_image_size:
+            params["image_size"] = "2K"
 
         is_nanobanana = params.get("__model_name__") == "nano-banana" or cmd in {
             "bnn",

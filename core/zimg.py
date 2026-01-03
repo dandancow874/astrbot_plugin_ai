@@ -1,4 +1,6 @@
 
+import base64
+
 from .openai_chat import OpenAIImagesProvider
 from .data import ProviderConfig
 from astrbot.api import logger
@@ -6,6 +8,84 @@ from curl_cffi.requests.exceptions import Timeout
 
 class ZImageProvider(OpenAIImagesProvider):
     api_type: str = "ZImage_Provider"
+
+    @staticmethod
+    def _extract_size_wh(size: str) -> tuple[int, int]:
+        raw = (size or "").strip().lower()
+        if "x" not in raw:
+            return 1024, 1024
+        a, b = raw.split("x", 1)
+        try:
+            w = int(a.strip())
+            h = int(b.strip())
+            if w > 0 and h > 0:
+                return w, h
+        except Exception:
+            pass
+        return 1024, 1024
+
+    @staticmethod
+    def _parse_png_dimensions(data: bytes) -> tuple[int, int] | None:
+        if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n":
+            return None
+        if data[12:16] != b"IHDR":
+            return None
+        w = int.from_bytes(data[16:20], "big")
+        h = int.from_bytes(data[20:24], "big")
+        if w > 0 and h > 0:
+            return w, h
+        return None
+
+    @staticmethod
+    def _parse_jpeg_dimensions(data: bytes) -> tuple[int, int] | None:
+        if len(data) < 4 or data[0:2] != b"\xFF\xD8":
+            return None
+        i = 2
+        while i + 9 < len(data):
+            if data[i] != 0xFF:
+                i += 1
+                continue
+            while i < len(data) and data[i] == 0xFF:
+                i += 1
+            if i >= len(data):
+                break
+            marker = data[i]
+            i += 1
+            if marker in (0xD8, 0xD9):
+                continue
+            if i + 1 >= len(data):
+                break
+            seg_len = int.from_bytes(data[i : i + 2], "big")
+            if seg_len < 2 or i + seg_len > len(data):
+                break
+            if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                if i + 7 >= len(data):
+                    break
+                h = int.from_bytes(data[i + 3 : i + 5], "big")
+                w = int.from_bytes(data[i + 5 : i + 7], "big")
+                if w > 0 and h > 0:
+                    return w, h
+                return None
+            i += seg_len
+        return None
+
+    @classmethod
+    def _infer_b64_dimensions(cls, mime: str, b64: str) -> tuple[int, int] | None:
+        if not isinstance(b64, str) or not b64.strip():
+            return None
+        try:
+            raw = base64.b64decode(b64[:200000], validate=False)
+        except Exception:
+            return None
+        mt = (mime or "").lower()
+        if "png" in mt:
+            return cls._parse_png_dimensions(raw)
+        if "jpeg" in mt or "jpg" in mt:
+            return cls._parse_jpeg_dimensions(raw)
+        dim = cls._parse_png_dimensions(raw)
+        if dim:
+            return dim
+        return cls._parse_jpeg_dimensions(raw)
 
     async def _call_api(
         self,
@@ -42,25 +122,39 @@ class ZImageProvider(OpenAIImagesProvider):
         size = self._map_image_size(params.get("image_size"), params.get("aspect_ratio"))
         if not size:
             size = "1024x1024"
+        w, h = self._extract_size_wh(size)
+        aspect_ratio = params.get("aspect_ratio")
+        want_ar = isinstance(aspect_ratio, str) and aspect_ratio.strip() and aspect_ratio.strip().lower() != "default"
 
-        body = {
+        extra: dict = {}
+        for k, v in params.items():
+            if k not in [
+                "image_size",
+                "aspect_ratio",
+                "prompt",
+                "n",
+                "size",
+                "width",
+                "height",
+                "response_format",
+                "model",
+                "__source_image_urls__",
+            ]:
+                extra[k] = v
+
+        body_base = {
             "model": params.get("model", provider_config.model),
             "prompt": prompt,
             "n": 1,
-            "size": size,
             "response_format": "b64_json",
         }
+        body_wh = {**body_base, "width": w, "height": h, **extra}
+        body_size = {**body_base, "size": size, **extra}
         
-        # 允许用户通过 params 传递 extra_body (如 num_inference_steps)
-        # 但过滤掉 aspect_ratio 和其他已处理字段
-        for k, v in params.items():
-            if k not in ["image_size", "aspect_ratio", "prompt", "n", "size", "response_format", "model", "__source_image_urls__"]:
-                body[k] = v
-
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
-            "X-Failover-Enabled": "true", # 用户建议添加
+            "X-Failover-Enabled": "true",
         }
 
         try:
@@ -82,19 +176,22 @@ class ZImageProvider(OpenAIImagesProvider):
             }
             if impersonate:
                 req_kwargs["impersonate"] = impersonate
+            if want_ar:
+                logger.info(f"[Z-Image] Request params: ar={aspect_ratio.strip()} size={size} width={w} height={h}")
 
-            response = await self.session.post(
-                url=resolved_url,
-                headers=headers,
-                json=body,
-                **req_kwargs,
-            )
-            result = response.json()
-            
-            if response.status_code == 200:
+            async def _send(body: dict):
+                r = await self.session.post(
+                    url=resolved_url,
+                    headers=headers,
+                    json=body,
+                    **req_kwargs,
+                )
+                return r, r.json()
+
+            async def _collect_images(res_obj: dict, resp_obj):
                 b64_images: list[tuple[str, str]] = []
                 images_url: list[str] = []
-                for item in (result.get("data") or []):
+                for item in (res_obj.get("data") or []):
                     if not isinstance(item, dict):
                         continue
                     b64 = item.get("b64_json")
@@ -111,10 +208,26 @@ class ZImageProvider(OpenAIImagesProvider):
 
                 b64_images = [(mime, b64) for mime, b64 in b64_images if b64]
                 if not b64_images:
+                    return None, f"响应中未包含图片数据: {resp_obj.text[:1024]}"
+                return b64_images, None
+
+            response, result = await _send(body_wh)
+            
+            if response.status_code == 200:
+                b64_images, err = await _collect_images(result, response)
+                if not b64_images:
                     logger.warning(
                         f"[Z-Image] 请求成功，但未返回图片数据, 响应内容: {response.text[:1024]}"
                     )
                     return None, 200, "响应中未包含图片数据"
+                if want_ar:
+                    dim = self._infer_b64_dimensions(b64_images[0][0], b64_images[0][1])
+                    if dim and dim[0] == dim[1]:
+                        response2, result2 = await _send(body_size)
+                        if response2.status_code == 200:
+                            b64_images2, _ = await _collect_images(result2, response2)
+                            if b64_images2:
+                                return b64_images2, 200, None
                 return b64_images, 200, None
 
             if (
@@ -123,41 +236,65 @@ class ZImageProvider(OpenAIImagesProvider):
                 and isinstance(result.get("error"), dict)
                 and isinstance(result["error"].get("message"), str)
                 and "参数无效 'size'" in result["error"]["message"]
-                and body.get("size") != "1024x1024"
+                and size != "1024x1024"
             ):
-                body["size"] = "1024x1024"
-                response = await self.session.post(
-                    url=resolved_url,
-                    headers=headers,
-                    json=body,
-                    **req_kwargs,
+                base_hint = params.get("image_size")
+                reduced_base = (
+                    "1536x1536"
+                    if isinstance(base_hint, str) and base_hint.strip().upper() in {"2K", "4K"}
+                    else "1024x1024"
                 )
-                result = response.json()
-                if response.status_code == 200:
-                    b64_images: list[tuple[str, str]] = []
-                    images_url: list[str] = []
-                    for item in (result.get("data") or []):
-                        if not isinstance(item, dict):
-                            continue
-                        b64 = item.get("b64_json")
-                        if isinstance(b64, str) and b64.strip():
-                            mime = self._guess_mime_from_b64(b64)
-                            b64_images.append((mime, b64))
-                            continue
-                        url = item.get("url")
-                        if isinstance(url, str) and url.strip():
-                            images_url.append(url)
+                candidates: list[str] = []
+                if want_ar and isinstance(aspect_ratio, str) and aspect_ratio.strip():
+                    reduced = self._map_image_size(reduced_base, aspect_ratio)
+                    if reduced and reduced != size:
+                        candidates.append(reduced)
+                candidates.append("1024x1024")
 
-                    if images_url:
-                        b64_images += await self.downloader.fetch_images(images_url)
+                for cand in candidates:
+                    w2, h2 = self._extract_size_wh(cand)
+                    body_wh2 = {**body_base, "width": w2, "height": h2, **extra}
+                    response2, result2 = await _send(body_wh2)
+                    if response2.status_code == 200:
+                        b64_images2, _ = await _collect_images(result2, response2)
+                        if b64_images2:
+                            return b64_images2, 200, None
 
-                    b64_images = [(mime, b64) for mime, b64 in b64_images if b64]
-                    if not b64_images:
-                        logger.warning(
-                            f"[Z-Image] 请求成功，但未返回图片数据, 响应内容: {response.text[:1024]}"
-                        )
-                        return None, 200, "响应中未包含图片数据"
-                    return b64_images, 200, None
+            if (
+                response.status_code == 400
+                and isinstance(result, dict)
+                and isinstance(result.get("error"), dict)
+                and isinstance(result["error"].get("message"), str)
+                and ("参数无效 'width'" in result["error"]["message"] or "参数无效 'height'" in result["error"]["message"])
+            ):
+                response2, result2 = await _send(body_size)
+                if response2.status_code == 200:
+                    b64_images2, _ = await _collect_images(result2, response2)
+                    if b64_images2:
+                        return b64_images2, 200, None
+
+                base_hint = params.get("image_size")
+                reduced_base = (
+                    "1536x1536"
+                    if isinstance(base_hint, str) and base_hint.strip().upper() in {"2K", "4K"}
+                    else "1024x1024"
+                )
+                if want_ar and isinstance(aspect_ratio, str) and aspect_ratio.strip():
+                    reduced = self._map_image_size(reduced_base, aspect_ratio)
+                else:
+                    reduced = reduced_base
+                if reduced and reduced != size:
+                    w3, h3 = self._extract_size_wh(reduced)
+                    response3, result3 = await _send({**body_base, "width": w3, "height": h3, **extra})
+                    if response3.status_code == 200:
+                        b64_images3, _ = await _collect_images(result3, response3)
+                        if b64_images3:
+                            return b64_images3, 200, None
+                    response4, result4 = await _send({**body_base, "size": reduced, **extra})
+                    if response4.status_code == 200:
+                        b64_images4, _ = await _collect_images(result4, response4)
+                        if b64_images4:
+                            return b64_images4, 200, None
 
             logger.error(
                 f"[Z-Image] 图片生成失败，状态码: {response.status_code}, 响应内容: {response.text[:1024]}"
@@ -203,6 +340,8 @@ class ZImageProvider(OpenAIImagesProvider):
         else:
             base_w, base_h = 1024, 1024
             
+        if isinstance(aspect_ratio, str):
+            aspect_ratio = aspect_ratio.strip("`'\" \t\r\n,，;；。.!！?？)）]】}、")
         if not aspect_ratio or aspect_ratio.lower() == "default":
             return f"{base_w}x{base_h}"
 
@@ -218,6 +357,18 @@ class ZImageProvider(OpenAIImagesProvider):
             (1536, 1024),
             (1024, 1536),
             (1536, 1536),
+            (2048, 2048),
+            (2048, 1536),
+            (1536, 2048),
+            (2048, 1152),
+            (1152, 2048),
+            (2048, 1024),
+            (1024, 2048),
+            (4096, 4096),
+            (4096, 3072),
+            (3072, 4096),
+            (4096, 2304),
+            (2304, 4096),
         ]
 
         target_area = base_w * base_h
