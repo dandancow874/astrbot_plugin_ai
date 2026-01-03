@@ -2515,10 +2515,8 @@ class BigBanana(Star):
                 provider.api_type == "OpenAI_Chat"
                 and ("grsai" in (provider.api_url or "").lower() or "dakka.com.cn" in (provider.api_url or "").lower())
             ):
-                if params_model == "nano-banana-pro" or (not params_model and provider_model == "nano-banana-pro"):
-                    logger.info(f"[BIG BANANA] main.py 强制映射模型: nano-banana-pro -> nano-banana")
-                    call_params = dict(params)
-                    call_params["model"] = "nano-banana"
+                # 移除之前的强制映射逻辑，允许 nano-banana-pro 直接透传
+                pass
 
             images_result, err = await self.provider_map[provider.api_type].generate_images(
                 provider_config=provider,

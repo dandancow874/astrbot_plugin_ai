@@ -75,9 +75,8 @@ class OpenAIChatProvider(BaseProvider):
             "Content-Type": "application/json",
         }
         model = (params.get("model") or provider_config.model or "").strip()
-        if model == "nano-banana-pro":
-            logger.info("[BIG BANANA] GrsAI 模型别名: nano-banana-pro -> nano-banana")
-            model = "nano-banana"
+        # 移除之前的强制映射逻辑，允许 nano-banana-pro 直接透传
+        
         prompt = params.get("prompt", "anything")
         urls = params.get("__source_image_urls__")
         if not isinstance(urls, list):
@@ -94,9 +93,6 @@ class OpenAIChatProvider(BaseProvider):
         image_size = params.get("image_size")
         if isinstance(image_size, str) and image_size.strip() in {"1K", "2K", "4K"}:
             payload["imageSize"] = image_size.strip()
-        elif model == "nano-banana":
-            # 如果是 nano-banana 且未指定 image_size，默认使用 2K
-            payload["imageSize"] = "2K"
         
         aspect_ratio = params.get("aspect_ratio")
         if isinstance(aspect_ratio, str):
