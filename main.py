@@ -2507,6 +2507,8 @@ class BigBanana(Star):
             provider_model = str(provider.model or "").strip()
             params_model = str(params.get("model", "") or "").strip()
             
+            logger.info(f"[BIG BANANA] Dispatch check: type={provider.api_type}, url={provider.api_url}, params_model={params_model}, provider_model={provider_model}")
+
             if (
                 provider.api_type == "OpenAI_Chat"
                 and ("grsai" in (provider.api_url or "").lower() or "dakka.com.cn" in (provider.api_url or "").lower())
