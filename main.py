@@ -607,6 +607,9 @@ class BigBanana(Star):
                 ):
                     item["api_type"] = "OpenAI_Images"
 
+                if conf_key == "zimg_config" and item.get("api_type") == "OpenAI_Images":
+                    item["api_type"] = "ZImage_Provider"
+
                 if api_type == "Vertex_AI_Anonymous":
                     item["keys"] = []
                     base_name = "Vertex匿名"
@@ -751,7 +754,7 @@ class BigBanana(Star):
             default_provider_stub={
                 "name": "Z-Image账号",
                 "enabled": True,
-                "api_type": "OpenAI_Images",
+                "api_type": "ZImage_Provider",
                 "keys": [],
                 "api_url": DEF_OPENAI_IMAGES_API_URL,
                 "model": "Z-Image-Turbo",

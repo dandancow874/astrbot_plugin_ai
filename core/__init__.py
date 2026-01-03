@@ -4,6 +4,7 @@ from .gemini import GeminiProvider
 from .http_manager import HttpManager
 from .openai_chat import OpenAIChatProvider
 from .vertex_ai_anonymous import VertexAIAnonymousProvider
+from .zimg import ZImageProvider
 
 __all__ = [
     "HttpManager",
@@ -12,4 +13,5 @@ __all__ = [
     "GeminiProvider",
     "OpenAIChatProvider",
     "VertexAIAnonymousProvider",
+    "ZImageProvider",
 ]
