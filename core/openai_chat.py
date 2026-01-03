@@ -803,19 +803,70 @@ class OpenAIImagesProvider(BaseProvider):
         return "image/png"
 
     @staticmethod
-    def _map_image_size(image_size: object) -> str | None:
+    def _map_image_size(image_size: object, aspect_ratio: str | None = None) -> str | None:
+        """
+        根据 image_size 和 aspect_ratio 计算最终的分辨率字符串 (WxH)。
+        如果提供了 aspect_ratio，会尝试适配比例。
+        """
         if not isinstance(image_size, str):
             return None
         size = image_size.strip().upper()
+        
+        # 基础分辨率映射 (1:1)
+        base_w, base_h = 1024, 1024
         if size == "1K":
-            return "1024x1024"
-        if size == "2K":
-            return "2048x2048"
-        if size == "4K":
-            return "4096x4096"
-        if "X" in size and all(p.isdigit() for p in size.split("X", 1)):
-            return size.lower().replace("x", "x")
-        return None
+            base_w, base_h = 1024, 1024
+        elif size == "2K":
+            base_w, base_h = 2048, 2048
+        elif size == "4K":
+            base_w, base_h = 4096, 4096
+        elif "X" in size and all(p.isdigit() for p in size.split("X", 1)):
+            parts = size.split("X", 1)
+            base_w, base_h = int(parts[0]), int(parts[1])
+        else:
+            # 默认为 1K 如果无法解析
+            base_w, base_h = 1024, 1024
+            
+        if not aspect_ratio or aspect_ratio.lower() == "default":
+            return f"{base_w}x{base_h}"
+
+        # 解析宽高比
+        try:
+            ar_w, ar_h = map(float, aspect_ratio.replace(":", " ").split())
+            ratio = ar_w / ar_h
+        except Exception:
+            return f"{base_w}x{base_h}"
+
+        # 简单的面积守恒或长边适配逻辑
+        # 策略：保持总像素数大致不变 (base_w * base_h)
+        target_area = base_w * base_h
+        
+        # new_w * new_h = target_area
+        # new_w / new_h = ratio  => new_w = ratio * new_h
+        # ratio * new_h^2 = target_area => new_h = sqrt(target_area / ratio)
+        
+        import math
+        new_h = math.sqrt(target_area / ratio)
+        new_w = new_h * ratio
+        
+        # 取整到最近的 64 倍数 (很多模型要求 64/32 倍数)
+        # OpenAI DALL-E 3 标准尺寸：
+        # 1024x1024
+        # 1792x1024 (16:9 approx)
+        # 1024x1792 (9:16 approx)
+        
+        # 适配 DALL-E 3 的特殊逻辑 (如果是 1K 且 16:9 或 9:16)
+        if base_w == 1024 and base_h == 1024:
+            if 1.7 < ratio < 1.8: # ~16:9
+                return "1792x1024"
+            if 0.5 < ratio < 0.6: # ~9:16
+                return "1024x1792"
+                
+        # 通用计算
+        final_w = int(round(new_w / 64) * 64)
+        final_h = int(round(new_h / 64) * 64)
+        
+        return f"{final_w}x{final_h}"
 
     async def _call_api(
         self,
@@ -855,14 +906,19 @@ class OpenAIImagesProvider(BaseProvider):
             "model": params.get("model", provider_config.model),
             "response_format": "b64_json",
         }
-        mapped_size = self._map_image_size(params.get("image_size"))
-        if mapped_size:
-            body["size"] = mapped_size
-            
-        # 注入 aspect_ratio 参数
+        
         aspect_ratio = params.get("aspect_ratio")
         if isinstance(aspect_ratio, str) and aspect_ratio.strip():
+            # 如果有宽高比，计算适配的 size
+            mapped_size = self._map_image_size(params.get("image_size"), aspect_ratio.strip())
+            # 同时也注入 aspect_ratio 字段，以防万一
             body["aspect_ratio"] = aspect_ratio.strip()
+        else:
+            mapped_size = self._map_image_size(params.get("image_size"))
+
+        if mapped_size:
+            body["size"] = mapped_size
+
 
         try:
             impersonate = (
@@ -981,7 +1037,7 @@ class OpenAIImagesProvider(BaseProvider):
             "model": params.get("model", provider_config.model),
             "response_format": "b64_json",
         }
-        mapped_size = self._map_image_size(params.get("image_size"))
+        mapped_size = self._map_image_size(params.get("image_size"), params.get("aspect_ratio"))
         if mapped_size:
             form["size"] = mapped_size
 
