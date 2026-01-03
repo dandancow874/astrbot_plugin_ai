@@ -1905,8 +1905,13 @@ class BigBanana(Star):
         }
         if cmd in {"bnn", "bnt", "bna"}:
             params["__model_name__"] = "nano-banana"
-            if cmd == "bnn" and "image_size" not in params:
+            
+            # 强制设置 image_size 为 2K（如果未指定且是 bnn 命令）
+            user_overrode_image_size = "image_size" in params and params["image_size"] is not None
+            if cmd == "bnn" and not user_overrode_image_size:
                 params["image_size"] = "2K"
+            
+            # 模型选择逻辑：如果没有覆盖，优先使用配置，其次强制使用 nano-banana-pro
             if not user_overrode_model and not str(params.get("model", "") or "").strip():
                 nanobanana_conf = self.conf.get("nanobanana_config", {})
                 primary_conf = (
@@ -1915,6 +1920,7 @@ class BigBanana(Star):
                 default_model = (
                     primary_conf.get("model", None) if isinstance(primary_conf, dict) else None
                 )
+                # 无论配置如何，如果没有配置，默认都是 nano-banana-pro
                 params["model"] = str(default_model).strip() if str(default_model or "").strip() else "nano-banana-pro"
         if is_nanobanana:
             if (

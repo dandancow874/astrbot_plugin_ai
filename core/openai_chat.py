@@ -342,14 +342,7 @@ class OpenAIChatProvider(BaseProvider):
         if self._is_grsai(provider_config.api_url):
             model = (params.get("model") or provider_config.model or "").strip()
             if model.startswith("nano-banana"):
-                if model == "nano-banana-pro":
-                    patched_params = dict(params)
-                    patched_params["model"] = "nano-banana"
-                    return await self._call_grsai_draw_api(
-                        provider_config=provider_config,
-                        api_key=api_key,
-                        params=patched_params,
-                    )
+                # 移除之前的强制映射逻辑，允许 nano-banana-pro 直接透传
                 return await self._call_grsai_draw_api(
                     provider_config=provider_config,
                     api_key=api_key,
@@ -511,14 +504,7 @@ class OpenAIChatProvider(BaseProvider):
         if self._is_grsai(provider_config.api_url):
             model = (params.get("model") or provider_config.model or "").strip()
             if model.startswith("nano-banana"):
-                if model == "nano-banana-pro":
-                    patched_params = dict(params)
-                    patched_params["model"] = "nano-banana"
-                    return await self._call_grsai_draw_api(
-                        provider_config=provider_config,
-                        api_key=api_key,
-                        params=patched_params,
-                    )
+                # 移除之前的强制映射逻辑，允许 nano-banana-pro 直接透传
                 return await self._call_grsai_draw_api(
                     provider_config=provider_config,
                     api_key=api_key,
