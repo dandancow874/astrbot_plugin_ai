@@ -833,35 +833,60 @@ class OpenAIImagesProvider(BaseProvider):
         # 解析宽高比
         try:
             ar_w, ar_h = map(float, aspect_ratio.replace(":", " ").split())
-            ratio = ar_w / ar_h
+            target_ratio = ar_w / ar_h
         except Exception:
             return f"{base_w}x{base_h}"
 
-        # 简单的面积守恒或长边适配逻辑
-        # 策略：保持总像素数大致不变 (base_w * base_h)
+        # 标准分辨率列表 (包含 SDXL, DALL-E 3, 以及常用分辨率)
+        # 优先匹配这些标准分辨率，以避免 "参数无效 'size'" 错误
+        STANDARD_SIZES = [
+            # 1:1
+            (1024, 1024), (512, 512), (2048, 2048),
+            # 16:9 / 9:16
+            (1792, 1024), (1024, 1792), # DALL-E 3
+            (1920, 1080), (1080, 1920), # FHD
+            (1344, 768), (768, 1344),   # SDXL 16:9
+            # 4:3 / 3:4
+            (1024, 768), (768, 1024),
+            (1152, 896), (896, 1152),   # SDXL 4:3
+            (1600, 1200), (1200, 1600), # 2MP 4:3
+            # 3:2 / 2:3
+            (1216, 832), (832, 1216),   # SDXL 3:2
+            # 21:9 / 9:21
+            (1536, 640), (640, 1536),   # SDXL 21:9
+        ]
+
         target_area = base_w * base_h
-        
-        # new_w * new_h = target_area
-        # new_w / new_h = ratio  => new_w = ratio * new_h
-        # ratio * new_h^2 = target_area => new_h = sqrt(target_area / ratio)
-        
+        best_size = None
+        min_score = float("inf")
+
+        for w, h in STANDARD_SIZES:
+            ratio = w / h
+            # 允许 5% 的宽高比误差
+            if abs(ratio - target_ratio) / target_ratio > 0.05:
+                continue
+            
+            # 评分标准：面积差异 + 宽高比差异 (加权)
+            area_diff = abs((w * h) - target_area) / target_area
+            ratio_diff = abs(ratio - target_ratio)
+            
+            # 如果目标是 2K (area > 2M)，则优先匹配大分辨率
+            # 如果目标是 1K (area <= 1M)，则优先匹配小分辨率
+            
+            score = area_diff + ratio_diff * 2
+            if score < min_score:
+                min_score = score
+                best_size = (w, h)
+
+        if best_size:
+            return f"{best_size[0]}x{best_size[1]}"
+
+        # 如果没有匹配到标准分辨率，回退到动态计算
+        # 简单的面积守恒或长边适配逻辑
         import math
-        new_h = math.sqrt(target_area / ratio)
-        new_w = new_h * ratio
+        new_h = math.sqrt(target_area / target_ratio)
+        new_w = new_h * target_ratio
         
-        # 取整到最近的 64 倍数 (很多模型要求 64/32 倍数)
-        # OpenAI DALL-E 3 标准尺寸：
-        # 1024x1024
-        # 1792x1024 (16:9 approx)
-        # 1024x1792 (9:16 approx)
-        
-        # 适配 DALL-E 3 的特殊逻辑 (如果是 1K 且 16:9 或 9:16)
-        if base_w == 1024 and base_h == 1024:
-            if 1.7 < ratio < 1.8: # ~16:9
-                return "1792x1024"
-            if 0.5 < ratio < 0.6: # ~9:16
-                return "1024x1792"
-                
         # 通用计算
         final_w = int(round(new_w / 64) * 64)
         final_h = int(round(new_h / 64) * 64)
