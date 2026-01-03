@@ -2504,13 +2504,18 @@ class BigBanana(Star):
                 )
                 
             call_params = params
+            provider_model = str(provider.model or "").strip()
+            params_model = str(params.get("model", "") or "").strip()
+            
             if (
                 provider.api_type == "OpenAI_Chat"
                 and ("grsai" in (provider.api_url or "").lower() or "dakka.com.cn" in (provider.api_url or "").lower())
-                and str(params.get("model", "") or "").strip() == "nano-banana-pro"
             ):
-                call_params = dict(params)
-                call_params["model"] = "nano-banana"
+                if params_model == "nano-banana-pro" or (not params_model and provider_model == "nano-banana-pro"):
+                    logger.info(f"[BIG BANANA] main.py 强制映射模型: nano-banana-pro -> nano-banana")
+                    call_params = dict(params)
+                    call_params["model"] = "nano-banana"
+
             images_result, err = await self.provider_map[provider.api_type].generate_images(
                 provider_config=provider,
                 params=call_params,
