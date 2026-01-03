@@ -42,8 +42,6 @@ class ZImageProvider(OpenAIImagesProvider):
         size = self._map_image_size(params.get("image_size"), params.get("aspect_ratio"))
         if not size:
             size = "1024x1024"
-        
-        logger.info(f"[Z-Image] Calculated resolution: {size} (from input: size={params.get('image_size')}, ar={params.get('aspect_ratio')})")
 
         body = {
             "model": params.get("model", provider_config.model),
@@ -119,6 +117,48 @@ class ZImageProvider(OpenAIImagesProvider):
                     return None, 200, "响应中未包含图片数据"
                 return b64_images, 200, None
 
+            if (
+                response.status_code == 400
+                and isinstance(result, dict)
+                and isinstance(result.get("error"), dict)
+                and isinstance(result["error"].get("message"), str)
+                and "参数无效 'size'" in result["error"]["message"]
+                and body.get("size") != "1024x1024"
+            ):
+                body["size"] = "1024x1024"
+                response = await self.session.post(
+                    url=resolved_url,
+                    headers=headers,
+                    json=body,
+                    **req_kwargs,
+                )
+                result = response.json()
+                if response.status_code == 200:
+                    b64_images: list[tuple[str, str]] = []
+                    images_url: list[str] = []
+                    for item in (result.get("data") or []):
+                        if not isinstance(item, dict):
+                            continue
+                        b64 = item.get("b64_json")
+                        if isinstance(b64, str) and b64.strip():
+                            mime = self._guess_mime_from_b64(b64)
+                            b64_images.append((mime, b64))
+                            continue
+                        url = item.get("url")
+                        if isinstance(url, str) and url.strip():
+                            images_url.append(url)
+
+                    if images_url:
+                        b64_images += await self.downloader.fetch_images(images_url)
+
+                    b64_images = [(mime, b64) for mime, b64 in b64_images if b64]
+                    if not b64_images:
+                        logger.warning(
+                            f"[Z-Image] 请求成功，但未返回图片数据, 响应内容: {response.text[:1024]}"
+                        )
+                        return None, 200, "响应中未包含图片数据"
+                    return b64_images, 200, None
+
             logger.error(
                 f"[Z-Image] 图片生成失败，状态码: {response.status_code}, 响应内容: {response.text[:1024]}"
             )
@@ -173,24 +213,11 @@ class ZImageProvider(OpenAIImagesProvider):
         except Exception:
             return f"{base_w}x{base_h}"
 
-        # Gitee AI / Z-Image-Turbo 专用常用分辨率 (基于 SDXL 最佳实践)
         STANDARD_SIZES = [
-            # 1:1
-            (1024, 1024), (768, 768), (512, 512),
-            (1440, 1440), # 2MP 1:1
-
-            # 16:9 / 9:16
-            (1344, 768), (768, 1344),   # SDXL 16:9 标准
-            (1920, 1080), (1080, 1920), # FHD (部分支持)
-            
-            # 4:3 / 3:4
-            (1152, 896), (896, 1152),   # SDXL 4:3 标准
-            
-            # 3:2 / 2:3
-            (1216, 832), (832, 1216),   # SDXL 3:2 标准
-            
-            # 21:9 / 9:21
-            (1536, 640), (640, 1536),   # SDXL 21:9 标准
+            (1024, 1024),
+            (1536, 1024),
+            (1024, 1536),
+            (1536, 1536),
         ]
 
         target_area = base_w * base_h
@@ -199,10 +226,6 @@ class ZImageProvider(OpenAIImagesProvider):
 
         for w, h in STANDARD_SIZES:
             ratio = w / h
-            # 允许 5% 的宽高比误差
-            if abs(ratio - target_ratio) / target_ratio > 0.05:
-                continue
-            
             # 评分标准：面积差异 + 宽高比差异 (加权)
             area_diff = abs((w * h) - target_area) / target_area
             ratio_diff = abs(ratio - target_ratio)
@@ -215,16 +238,4 @@ class ZImageProvider(OpenAIImagesProvider):
         if best_size:
             return f"{best_size[0]}x{best_size[1]}"
 
-        # 兜底计算 (确保 64 对齐)
-        import math
-        new_h = math.sqrt(target_area / target_ratio)
-        new_w = new_h * target_ratio
-        
-        final_w = int(round(new_w / 64) * 64)
-        final_h = int(round(new_h / 64) * 64)
-        
-        # 再次检查是否过大 (Z-Image 限制 4MP，建议 2048 以下)
-        if final_w > 2048: final_w = 2048
-        if final_h > 2048: final_h = 2048
-        
-        return f"{final_w}x{final_h}"
+        return "1024x1024"
