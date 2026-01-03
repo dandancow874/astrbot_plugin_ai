@@ -1905,6 +1905,8 @@ class BigBanana(Star):
         }
         if cmd in {"bnn", "bnt", "bna"}:
             params["__model_name__"] = "nano-banana"
+            if cmd == "bnn" and "image_size" not in params:
+                params["image_size"] = "2K"
             if not user_overrode_model and not str(params.get("model", "") or "").strip():
                 nanobanana_conf = self.conf.get("nanobanana_config", {})
                 primary_conf = (
