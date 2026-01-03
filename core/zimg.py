@@ -19,9 +19,22 @@ class ZImageProvider(OpenAIImagesProvider):
         不发送 aspect_ratio 字段，完全依赖 size 字段
         """
         # Z-Image 不支持图生图 (edits)，忽略 image_b64_list
-        resolved_url = (provider_config.api_url or "").strip().rstrip("/")
+        # 清理 URL: 去除首尾空格、反引号、逗号、单双引号
+        raw_url = (provider_config.api_url or "").strip(" \t\n\r`'\",")
+        resolved_url = raw_url.rstrip("/")
+        
         if not resolved_url:
             resolved_url = "https://ai.gitee.com/v1/images/generations"
+        elif "/images/generations" not in resolved_url:
+            # 如果是 /v1 结尾，追加 /images/generations
+            if resolved_url.endswith("/v1"):
+                resolved_url += "/images/generations"
+            # 如果包含 /chat/completions (用户可能复制了对话接口)，替换为 /images/generations
+            elif "/chat/completions" in resolved_url:
+                resolved_url = resolved_url.replace("/chat/completions", "/images/generations")
+            # 否则假设用户只填了 Base URL (如 https://ai.gitee.com/v1)，尝试追加
+            else:
+                resolved_url += "/images/generations"
 
         prompt = params.get("prompt", "anything")
         
