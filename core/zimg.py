@@ -347,7 +347,13 @@ class ZImageProvider(OpenAIImagesProvider):
 
         # 解析宽高比
         try:
-            ar_w, ar_h = map(float, aspect_ratio.replace(":", " ").split())
+            normalized_ar = (
+                aspect_ratio.replace("：", ":")
+                .replace("／", ":")
+                .replace("/", ":")
+                .replace("\\", ":")
+            )
+            ar_w, ar_h = map(float, normalized_ar.replace(":", " ").split())
             target_ratio = ar_w / ar_h
         except Exception:
             return f"{base_w}x{base_h}"
@@ -357,6 +363,10 @@ class ZImageProvider(OpenAIImagesProvider):
             (1536, 1024),
             (1024, 1536),
             (1536, 1536),
+            (1024, 768),
+            (768, 1024),
+            (1536, 1152),
+            (1152, 1536),
             (2048, 2048),
             (2048, 1536),
             (1536, 2048),
@@ -364,9 +374,23 @@ class ZImageProvider(OpenAIImagesProvider):
             (1152, 2048),
             (2048, 1024),
             (1024, 2048),
+            (2048, 1344),
+            (1344, 2048),
+            (2048, 1280),
+            (1280, 2048),
+            (2048, 1664),
+            (1664, 2048),
+            (2048, 896),
+            (896, 2048),
             (4096, 4096),
             (4096, 3072),
             (3072, 4096),
+            (4096, 2688),
+            (2688, 4096),
+            (4096, 2560),
+            (2560, 4096),
+            (4096, 1792),
+            (1792, 4096),
             (4096, 2304),
             (2304, 4096),
         ]

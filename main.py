@@ -1093,6 +1093,7 @@ class BigBanana(Star):
                     else:
                         if key == "aspect_ratio":
                             value = value.strip("`'\" \t\r\n,，;；。.!！?？)）]】}、")
+                            value = value.replace("：", ":").replace("／", ":").replace("/", ":").replace("\\", ":")
                         params[key] = value
                     continue
             filtered.append(token)
