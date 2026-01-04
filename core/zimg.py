@@ -69,6 +69,49 @@ class ZImageProvider(OpenAIImagesProvider):
             i += seg_len
         return None
 
+    @staticmethod
+    def _parse_webp_dimensions(data: bytes) -> tuple[int, int] | None:
+        if len(data) < 30 or data[0:4] != b"RIFF" or data[8:12] != b"WEBP":
+            return None
+
+        i = 12
+        while i + 8 <= len(data):
+            chunk_type = data[i : i + 4]
+            chunk_size = int.from_bytes(data[i + 4 : i + 8], "little")
+            chunk_start = i + 8
+            chunk_end = chunk_start + chunk_size
+            if chunk_end > len(data):
+                break
+
+            if chunk_type == b"VP8X" and chunk_size >= 10:
+                w = 1 + int.from_bytes(data[chunk_start + 4 : chunk_start + 7], "little")
+                h = 1 + int.from_bytes(data[chunk_start + 7 : chunk_start + 10], "little")
+                if w > 0 and h > 0:
+                    return w, h
+
+            if chunk_type == b"VP8 " and chunk_size >= 10:
+                frame = data[chunk_start : min(chunk_end, chunk_start + 32)]
+                sig = frame.find(b"\x9d\x01\x2a")
+                if sig != -1 and sig + 7 <= len(frame):
+                    w = int.from_bytes(frame[sig + 3 : sig + 5], "little") & 0x3FFF
+                    h = int.from_bytes(frame[sig + 5 : sig + 7], "little") & 0x3FFF
+                    if w > 0 and h > 0:
+                        return w, h
+
+            if chunk_type == b"VP8L" and chunk_size >= 5:
+                if data[chunk_start] == 0x2F:
+                    b0 = data[chunk_start + 1]
+                    b1 = data[chunk_start + 2]
+                    b2 = data[chunk_start + 3]
+                    b3 = data[chunk_start + 4]
+                    w = 1 + (((b1 & 0x3F) << 8) | b0)
+                    h = 1 + (((b3 & 0x0F) << 10) | (b2 << 2) | ((b1 & 0xC0) >> 6))
+                    if w > 0 and h > 0:
+                        return w, h
+
+            i = chunk_end + (chunk_size % 2)
+        return None
+
     @classmethod
     def _infer_b64_dimensions(cls, mime: str, b64: str) -> tuple[int, int] | None:
         if not isinstance(b64, str) or not b64.strip():
@@ -82,10 +125,15 @@ class ZImageProvider(OpenAIImagesProvider):
             return cls._parse_png_dimensions(raw)
         if "jpeg" in mt or "jpg" in mt:
             return cls._parse_jpeg_dimensions(raw)
+        if "webp" in mt:
+            return cls._parse_webp_dimensions(raw)
         dim = cls._parse_png_dimensions(raw)
         if dim:
             return dim
-        return cls._parse_jpeg_dimensions(raw)
+        dim = cls._parse_jpeg_dimensions(raw)
+        if dim:
+            return dim
+        return cls._parse_webp_dimensions(raw)
 
     async def _call_api(
         self,
@@ -223,11 +271,40 @@ class ZImageProvider(OpenAIImagesProvider):
                 if want_ar:
                     dim = self._infer_b64_dimensions(b64_images[0][0], b64_images[0][1])
                     if dim and dim[0] == dim[1]:
-                        response2, result2 = await _send(body_size)
-                        if response2.status_code == 200:
-                            b64_images2, _ = await _collect_images(result2, response2)
-                            if b64_images2:
-                                return b64_images2, 200, None
+                        ar_text = aspect_ratio.strip() if isinstance(aspect_ratio, str) else ""
+                        base_hint = params.get("image_size")
+                        reduced_base = (
+                            "1536x1536"
+                            if isinstance(base_hint, str) and base_hint.strip().upper() in {"2K", "4K"}
+                            else "1024x1024"
+                        )
+                        candidates: list[str] = []
+                        for base in [params.get("image_size"), reduced_base, "1024x1024"]:
+                            mapped = self._map_image_size(base, ar_text)
+                            if mapped and mapped not in candidates:
+                                candidates.append(mapped)
+
+                        for cand in candidates:
+                            w2, h2 = self._extract_size_wh(cand)
+                            if want_ar:
+                                logger.info(
+                                    f"[Z-Image] Square output detected, retry with size={cand} width={w2} height={h2}"
+                                )
+                            for body in [
+                                {**body_base, "width": w2, "height": h2, **extra},
+                                {**body_base, "size": cand, **extra},
+                                {**body_base, "size": cand, "aspect_ratio": ar_text, **extra},
+                                {**body_base, "width": w2, "height": h2, "aspect_ratio": ar_text, **extra},
+                            ]:
+                                response2, result2 = await _send(body)
+                                if response2.status_code != 200:
+                                    continue
+                                b64_images2, _ = await _collect_images(result2, response2)
+                                if not b64_images2:
+                                    continue
+                                dim2 = self._infer_b64_dimensions(b64_images2[0][0], b64_images2[0][1])
+                                if dim2 and dim2[0] != dim2[1]:
+                                    return b64_images2, 200, None
                 return b64_images, 200, None
 
             if (
