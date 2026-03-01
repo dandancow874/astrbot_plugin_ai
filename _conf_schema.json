@@ -11,6 +11,8 @@
             "bt3 {{user_text}} --min_images 0 --gather_mode --image_size 2K",
             "zimg {{user_text}} --min_images 0 --image_size 2K",
             "edit {{user_text}} --min_images 1",
+            "mj {{user_text}} --min_images 0 ",
+            "nj {{user_text}} --min_images 0 ",
             "反推 详细描述这张图片 --min_images 1"
         ],
         "hint": "格式1: 触发词 提示词 --参数1 参数值1 --参数2 参数值2。格式2: [触发词1,触发词2] 提示词 --参数1 参数值1 --参数2 参数值2。触发词和触发词列表不能有空格。若省略参数值，则视为布尔值true。占位提示词：{{user_text}}，占位提示词会被消息内容覆盖，用于自定义提示词，可以在占位提示词前后添加固定的预设提示词。可选的参数请参考 README.md。触发词冲突可能会相互覆盖。"
