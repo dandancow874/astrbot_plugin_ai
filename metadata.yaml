@@ -4,3 +4,5 @@ desc: 图片生成插件
 version: v0.2.2
 author: dandancow874
 repo: https://github.com/dandancow874/astrbot_plugin_ai
+
+class_name: BigBanana
