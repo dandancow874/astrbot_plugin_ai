@@ -18,7 +18,7 @@
     "nano-banana-2_config": {
         "description": "🍌 nano-banana-2 模型配置",
         "type": "object",
-        "hint": "nb2 会使用这里配置的 URL 与 API Key。",
+        "hint": "bt1,bt2,bt3 会使用这里配置的 URL 与 API Key。",
         "items": {
             "enabled": {
                 "description": "启用",

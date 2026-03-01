@@ -72,6 +72,8 @@ MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 MAX_SIZE_B64_LEN = int(MAX_SIZE_BYTES * 4 / 3)
 
 
+__all__ = ["BigBanana"]
+
 class BigBanana(Star):
     MAX_CONCURRENT_JOBS = 8
 
@@ -735,7 +737,7 @@ class BigBanana(Star):
         upsert_fixed_model(
             conf_key="nano-banana-2_config",
             name="nano-banana-2",
-            default_triggers=["nb2"],
+            default_triggers=["bt1", "bt2", "bt3"],
             default_provider_stub={
                 "name": "nano-banana-2账号",
                 "enabled": True,
@@ -1750,8 +1752,6 @@ class BigBanana(Star):
         if cmd == "zimg" and not user_overrode_image_size:
             params["image_size"] = "2K"
 
-        if cmd == "nb2" and not user_overrode_image_size:
-            params["image_size"] = "2K"            
 
         is_nanobanana = params.get("__model_name__") == "nano-banana-pro" or cmd in {
             "bnn",
