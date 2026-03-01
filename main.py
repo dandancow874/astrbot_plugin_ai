@@ -548,9 +548,8 @@ class BigBanana(Star):
 
         # 兼容旧配置：如果 models 为空，检查是否有 extra_models 或 default_model 并迁移
         # 这是一个临时迁移逻辑，防止用户更新后配置丢失
-        if not models_data:
+        # (迁移逻辑已在前面完成)
         updated_models = False
-
         def parse_keys(raw: object) -> list[str]:
             if not isinstance(raw, str):
                 return []
