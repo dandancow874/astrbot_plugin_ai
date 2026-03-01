@@ -771,7 +771,7 @@ class BigBanana(Star):
                 "model": "nano-banana-pro",
                 "stream": False,
             },
-            insert_index=0,
+            insert_index=1,
         )
         upsert_fixed_model(
             conf_key="zimage_config",
@@ -786,7 +786,7 @@ class BigBanana(Star):
                 "model": "Z-Image-Turbo",
                 "stream": False,
             },
-            insert_index=1,
+            insert_index=2,
         )
         upsert_fixed_model(
             conf_key="qwen_edit_2511_config",
@@ -801,6 +801,7 @@ class BigBanana(Star):
                 "model": "Qwen-Image-Edit-2511",
                 "stream": False,
             },
+            insert_index=3,
         )
         upsert_fixed_model(
             conf_key="midjourney_config",
@@ -815,7 +816,7 @@ class BigBanana(Star):
                 "model": "V 7",
                 "stream": False,
             },
-            insert_index=3,
+            insert_index=4,
         )
         upsert_fixed_model(
             conf_key="midjourney_config",
@@ -830,7 +831,7 @@ class BigBanana(Star):
                 "model": "niji 7",
                 "stream": False,
             },
-            insert_index=4,
+            insert_index=5,
         )
 
 
