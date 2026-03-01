@@ -411,21 +411,6 @@ class BigBanana(Star):
         self.user_whitelist_enabled = self.whitelist_config.get("user_enabled", False)
         self.user_whitelist = self.whitelist_config.get("user_whitelist", [])
 
-        nanobanana_conf = self.conf.get("nanobanana_config", {})
-        if not isinstance(nanobanana_conf, dict):
-            nanobanana_conf = {}
-        nanobanana_whitelist = nanobanana_conf.get("whitelist", {})
-        if not isinstance(nanobanana_whitelist, dict):
-            nanobanana_whitelist = {}
-        self.nanobanana_group_whitelist_enabled = bool(
-            nanobanana_whitelist.get("enabled", False)
-        )
-        self.nanobanana_group_whitelist = nanobanana_whitelist.get("whitelist", [])
-        self.nanobanana_user_whitelist_enabled = bool(
-            nanobanana_whitelist.get("user_enabled", False)
-        )
-        self.nanobanana_user_whitelist = nanobanana_whitelist.get("user_whitelist", [])
-
         # 前缀配置
         prefix_config = self.conf.get("prefix_config", {})
         self.coexist_enabled = prefix_config.get("coexist_enabled", False)
@@ -628,38 +613,6 @@ class BigBanana(Star):
                 primary_data = build_provider_item(primary_conf, "主")
                 provider_list.append(primary_data)
 
-                secondary_conf = model_conf.get("secondary", {})
-                if not isinstance(secondary_conf, dict):
-                    secondary_conf = {}
-                secondary_url = secondary_conf.get("api_url", "")
-                secondary_key = secondary_conf.get("api_key", "")
-                secondary_api_type = secondary_conf.get("api_type", "")
-                secondary_model = secondary_conf.get("model", "")
-                if conf_key == "nanobanana_config" and not (
-                    str(secondary_api_type).strip()
-                    or str(secondary_url).strip()
-                    or str(secondary_key).strip()
-                    or str(secondary_model).strip()
-                ):
-                    secondary_url = "https://ai.t8star.cn"
-                    secondary_api_type = "OpenAI_Images"
-                    secondary_model = "nano-banana-2-2k"
-                if (
-                    str(secondary_api_type).strip() == "Vertex_AI_Anonymous"
-                    or str(secondary_url).strip()
-                    or str(secondary_key).strip()
-                    or str(secondary_model).strip()
-                ):
-                    secondary_data = build_provider_item(
-                        {
-                            "api_type": secondary_api_type,
-                            "api_url": secondary_url,
-                            "api_key": secondary_key,
-                            "model": secondary_model,
-                        },
-                        "备",
-                    )
-                    provider_list.append(secondary_data)
 
                 providers = provider_list
 
@@ -776,156 +729,6 @@ class BigBanana(Star):
                 "stream": False,
             },
             insert_index=2,
-        )
-        upsert_fixed_model(
-            conf_key="flow2api_config",
-            name="flow2api bt1 文生图 横屏",
-            default_triggers=["bt1"],
-            default_provider_stub={
-                "name": "flow2api",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
-                "model": "gemini-3.0-pro-image-landscape",
-                "stream": True,
-            },
-            insert_index=3,
-        )
-        upsert_fixed_model(
-            conf_key="flow2api_config",
-            name="flow2api bt2 文生图 竖屏",
-            default_triggers=["bt2"],
-            default_provider_stub={
-                "name": "flow2api",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
-                "model": "gemini-3.0-pro-image-portrait",
-                "stream": True,
-            },
-            insert_index=4,
-        )
-        upsert_fixed_model(
-            conf_key="flow2api_config",
-            name="flow2api bp1 图生图 横屏",
-            default_triggers=["bp1"],
-            default_provider_stub={
-                "name": "flow2api",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
-                "model": "gemini-3.0-pro-image-landscape",
-                "stream": True,
-            },
-            insert_index=5,
-        )
-        upsert_fixed_model(
-            conf_key="flow2api_config",
-            name="flow2api bp2 图生图 竖屏",
-            default_triggers=["bp2"],
-            default_provider_stub={
-                "name": "flow2api",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
-                "model": "gemini-3.0-pro-image-portrait",
-                "stream": True,
-            },
-            insert_index=6,
-        )
-        upsert_fixed_model(
-            conf_key="flow2api_config",
-            name="flow2api tv1 文生视频 横屏",
-            default_triggers=["tv1"],
-            default_provider_stub={
-                "name": "flow2api",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
-                "model": "veo_3_1_t2v_fast_landscape",
-                "stream": True,
-            },
-            insert_index=7,
-        )
-        upsert_fixed_model(
-            conf_key="flow2api_config",
-            name="flow2api tv2 文生视频 竖屏",
-            default_triggers=["tv2"],
-            default_provider_stub={
-                "name": "flow2api",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
-                "model": "veo_3_1_t2v_fast_portrait",
-                "stream": True,
-            },
-            insert_index=8,
-        )
-        upsert_fixed_model(
-            conf_key="flow2api_config",
-            name="flow2api iv1 首尾帧图生视频 横屏",
-            default_triggers=["iv1"],
-            default_provider_stub={
-                "name": "flow2api",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
-                "model": "veo_3_1_i2v_s_fast_fl_landscape",
-                "stream": True,
-            },
-            insert_index=9,
-        )
-        upsert_fixed_model(
-            conf_key="flow2api_config",
-            name="flow2api iv2 首尾帧图生视频 竖屏",
-            default_triggers=["iv2"],
-            default_provider_stub={
-                "name": "flow2api",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
-                "model": "veo_3_1_i2v_s_fast_fl_portrait",
-                "stream": True,
-            },
-            insert_index=10,
-        )
-        upsert_fixed_model(
-            conf_key="flow2api_config",
-            name="flow2api rv1 图生视频 横屏",
-            default_triggers=["rv1"],
-            default_provider_stub={
-                "name": "flow2api",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
-                "model": "veo_3_0_r2v_fast_landscape",
-                "stream": True,
-            },
-            insert_index=11,
-        )
-        upsert_fixed_model(
-            conf_key="flow2api_config",
-            name="flow2api rv2 图生视频 竖屏",
-            default_triggers=["rv2"],
-            default_provider_stub={
-                "name": "flow2api",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
-                "model": "veo_3_0_r2v_fast_portrait",
-                "stream": True,
-            },
-            insert_index=12,
         )
 
         if updated_models:
@@ -2609,50 +2412,6 @@ class BigBanana(Star):
                     if images_result:
                         logger.info(f"模型 {target_model.name} - {provider.name} 图片生成成功")
                         return images_result, None
-
-        if allow_fallback:
-            fallback_probe_model = (params.get("model") or candidate_providers[0].model or "").strip()
-            is_video_model = fallback_probe_model.startswith("veo_")
-            is_flow2api = any((p.name or "").strip() == "flow2api" for p in candidate_providers)
-            html_like_error = isinstance(err, str) and (
-                "HTML" in err
-                or "响应内容格式错误" in err
-                or "媒体下载失败" in err
-                or "API 地址不存在" in err
-                or "状态码 401" in err
-                or "状态码 403" in err
-                or "状态码 404" in err
-            )
-            if is_flow2api and not is_video_model and html_like_error:
-                fallback_model = next(
-                    (m for m in self.models if m.enabled and m.name in {"nano-banana", "Z-Image-Turbo"}),
-                    None,
-                )
-                if not fallback_model:
-                    fallback_model = next(
-                        (
-                            m
-                            for m in self.models
-                            if m.enabled
-                            and m.name != target_model.name
-                            and any((p.name or "").strip() != "flow2api" for p in m.providers)
-                        ),
-                        None,
-                    )
-                if fallback_model:
-                    fallback_params = params.copy()
-                    fallback_params["__model_name__"] = fallback_model.name
-                    fallback_params.pop("provider", None)
-                    images_result, fallback_err = await self._dispatch(
-                        params=fallback_params,
-                        image_b64_list=image_b64_list,
-                        allow_fallback=False,
-                    )
-                    if images_result:
-                        return images_result, None
-                    if fallback_err:
-                        err = fallback_err
-
         # 处理错误信息
         best_err = params.get("__best_err__")
         if isinstance(best_err, str) and best_err.strip():
