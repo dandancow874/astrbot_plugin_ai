@@ -1735,8 +1735,6 @@ class BigBanana(Star):
                 )
                 # 无论配置如何，如果没有配置，默认都是 nano-banana-pro
                 params["model"] = str(default_model).strip() if str(default_model or "").strip() else "nano-banana-pro"
-        if is_nanobanana:
-
         if cmd == "反推":
             min_required_images = params.get("min_images", self.prompt_config.min_images)
             try:
