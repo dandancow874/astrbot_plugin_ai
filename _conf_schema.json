@@ -12,6 +12,52 @@
         ],
         "hint": "格式1: 触发词 提示词 --参数1 参数值1 --参数2 参数值2。格式2: [触发词1,触发词2] 提示词 --参数1 参数值1 --参数2 参数值2。触发词和触发词列表不能有空格。若省略参数值，则视为布尔值true。占位提示词：{{user_text}}，占位提示词会被消息内容覆盖，用于自定义提示词，可以在占位提示词前后添加固定的预设提示词。可选的参数请参考 README.md。触发词冲突可能会相互覆盖。"
     },
+    "nano-banana-2_config": {
+        "description": "🍌 nano-banana-2 模型配置",
+        "type": "object",
+        "hint": "nb2 会使用这里配置的 URL 与 API Key。",
+        "items": {
+            "enabled": {
+                "description": "启用",
+                "type": "bool",
+                "default": true
+            },
+            "primary": {
+                "description": "主提供商",
+                "type": "object",
+                "items": {
+                    "api_url": {
+                        "description": "OpenAI兼容 Base URL",
+                        "type": "string",
+                        "default": "https://grsai.dakka.com.cn",
+                        "hint": "推荐填 Base URL，例如 https://grsai.dakka.com.cn。插件会将 nano-banana* 模型请求路由到 /v1/draw/nano-banana。"
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                    },
+                    "model": {
+                        "description": "模型名称",
+                        "type": "string",
+                        "default": "nano-banana-22",
+                        "hint": "填 grsai 支持的模型名，例如 nano-banana-pro。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
+                    }
+                }
+            }
+        }
+    },
     "nanobanana_config": {
         "description": "🍌 nano-banana 模型配置",
         "type": "object",

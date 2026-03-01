@@ -733,8 +733,23 @@ class BigBanana(Star):
                 updated_models = True
 
         upsert_fixed_model(
+            conf_key="nano-banana-2_config",
+            name="nano-banana-2",
+            default_triggers=["nb2"],
+            default_provider_stub={
+                "name": "nano-banana-2账号",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "https://grsai.dakka.com.cn",
+                "model": "nano-banana-2",
+                "stream": False,
+            },
+            insert_index=0,
+        )
+        upsert_fixed_model(
             conf_key="nanobanana_config",
-            name="nano-banana",
+            name="nano-banana-pro",
             default_triggers=["bnn", "bnt", "bna"],
             default_provider_stub={
                 "name": "nano-banana账号",
@@ -1907,13 +1922,16 @@ class BigBanana(Star):
         if cmd == "zimg" and not user_overrode_image_size:
             params["image_size"] = "2K"
 
-        is_nanobanana = params.get("__model_name__") == "nano-banana" or cmd in {
+        if cmd == "nb2" and not user_overrode_image_size:
+            params["image_size"] = "2K"            
+
+        is_nanobanana = params.get("__model_name__") == "nano-banana-pro" or cmd in {
             "bnn",
             "bnt",
             "bna",
         }
         if cmd in {"bnn", "bnt", "bna"}:
-            params["__model_name__"] = "nano-banana"
+            params["__model_name__"] = "nano-banana-pro]"
             
             # 强制设置 image_size 为 2K（如果未指定且是 bnn 命令）
             user_overrode_image_size = "image_size" in params and params["image_size"] is not None
