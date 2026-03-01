@@ -939,10 +939,48 @@ class BigBanana(Star):
             insert_index=12,
         )
 
+        # === 新增：从 providers[].models 提取模型配置 ===
+        # 如果 models_data 为空，尝试从 providers 结构中提取
+        if not models_data:
+            providers_raw = self.conf.get("providers", [])
+            if isinstance(providers_raw, list):
+                for prov in providers_raw:
+                    if not isinstance(prov, dict):
+                        continue
+                    prov_models = prov.get("models", [])
+                    if not isinstance(prov_models, list):
+                        continue
+                    for mi in prov_models:
+                        if not isinstance(mi, dict):
+                            continue
+                        model_name = mi.get("model_name", "")
+                        triggers = mi.get("triggers", [])
+                        if not model_name or not triggers:
+                            continue
+                        # 构建 provider 配置项（继承父级 provider 配置）
+                        provider_item = {
+                            "name": prov.get("name", "Unknown"),
+                            "enabled": prov.get("enabled", True),
+                            "priority": prov.get("priority", 0),
+                            "api_url": prov.get("base_url", ""),
+                            "api_key": prov.get("api_key", ""),
+                            "api_type": prov.get("api_type", "OpenAI_Chat"),
+                            "tls_verify": prov.get("tls_verify", True),
+                            "impersonate": prov.get("impersonate", "chrome131"),
+                            "model": model_name,
+                            "stream": False,
+                        }
+                        # 使用 model_name 作为模型名称
+                        models_data.append({
+                            "name": model_name,
+                            "triggers": triggers,
+                            "providers": [provider_item],
+                            "enabled": True,
+                        })
+
         if updated_models:
             self.conf["models"] = models_data
             self.conf.save_config()
-
         for model_data in models_data:
             # Parse ProviderConfig list
             providers_data = model_data.get("providers", [])
