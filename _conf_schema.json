@@ -3,9 +3,12 @@
         "description": "预设提示词",
         "type": "list",
         "default": [
-            "bnn {{user_text}} --min_images 1 --image_size 2K",
-            "bnt {{user_text}} --min_images 0 --image_size 2K",
-            "bna {{user_text}} --min_images 0 --gather_mode --image_size 2K",
+            "bp1 {{user_text}} --min_images 1 --image_size 2K",
+            "bp2 {{user_text}} --min_images 0 --image_size 2K",
+            "bp3 {{user_text}} --min_images 0 --gather_mode --image_size 2K",
+            "bt1 {{user_text}} --min_images 1 --image_size 2K",
+            "bt2 {{user_text}} --min_images 0 --image_size 2K",
+            "bt3 {{user_text}} --min_images 0 --gather_mode --image_size 2K",
             "zimg {{user_text}} --min_images 0 --image_size 2K",
             "edit {{user_text}} --min_images 1",
             "反推 详细描述这张图片 --min_images 1"
@@ -41,8 +44,8 @@
                     "model": {
                         "description": "模型名称",
                         "type": "string",
-                        "default": "nano-banana-22",
-                        "hint": "填 grsai 支持的模型名，例如 nano-banana-pro。"
+                        "default": "nano-banana-2",
+                        "hint": "填 grsai 支持的模型名，例如 nano-banana-2。"
                     },
                     "tls_verify": {
                         "description": "TLS证书验证",
