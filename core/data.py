@@ -10,33 +10,63 @@ DEF_VERTEX_AI_ANONYMOUS_BASE_API = "https://cloudconsole-pa.clients6.google.com"
 # 类型枚举
 _API_Type = Literal["Gemini", "OpenAI_Chat", "OpenAI_Images", "Vertex_AI_Anonymous"]
 
+
+@dataclass(repr=False, slots=True)
+class ModelParams:
+    """模型默认参数"""
+
+    max_images: int = 6
+    """最大输入图片数量"""
+    image_size: str = "2K"
+    """分辨率"""
+    aspect_ratio: str = "default"
+    """宽高比"""
+
+
+@dataclass(repr=False, slots=True)
+class ModelInfo:
+    """模型信息"""
+
+    model_name: str
+    """模型名称"""
+    triggers: list[str]
+    """触发词列表"""
+    default_params: ModelParams = ModelParams()
+    """默认参数"""
+
+
 @dataclass(repr=False, slots=True)
 class ProviderConfig:
-    """提供商配置信息"""
+    """服务商配置信息"""
 
     name: str
-    """提供商名称, 用于区分不同提供商(例如主提供商、备用提供商等)"""
+    """服务商名称"""
     enabled: bool
     """是否启用"""
+    priority: int
+    """优先级，数值越小越优先"""
+    base_url: str
+    """Base URL"""
+    api_key: str
+    """API Key"""
     api_type: _API_Type
-    """API 格式类型"""
-    keys: list[str]
-    """API 密钥列表, 可选。部分提供商可能不需要此字段"""
-    api_url: str
-    """API 地址, 可选, 若不提供则使用默认地址。部分提供商可能不需要此字段"""
-    model: str = "gemini-3-pro-image-preview"
-    """模型名称"""
-    stream: bool = False
-    """是否启用流式响应"""
-    tls_verify: bool | None = None
-    """是否验证 TLS 证书（None 表示使用默认行为）"""
-    impersonate: str | None = None
-    """curl_cffi 指纹伪装标识（None 表示不启用）"""
+    """API 类型"""
+    tls_verify: bool = True
+    """TLS 证书验证"""
+    impersonate: str = "chrome131"
+    """TLS/UA 指纹伪装"""
+    models: list[ModelInfo] = None
+    """模型列表"""
+
+    def __post_init__(self):
+        if self.models is None:
+            self.models = []
 
 
 @dataclass(repr=False, slots=True)
 class ModelConfig:
-    """模型配置，包含一组提供商和触发词"""
+    """内部模型配置，用于兼容现有代码"""
+
     name: str
     """模型名称"""
     triggers: list[str]
