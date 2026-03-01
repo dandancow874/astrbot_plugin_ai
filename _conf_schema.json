@@ -2,20 +2,18 @@
     "prompt": {
         "description": "预设提示词",
         "type": "list",
-        "default": [
-            "反推 详细描述这张图片 --min_images 1"
-        ],
+        "default": ["反推 详细描述这张图片 --min_images 1"],
         "hint": "只保留反推命令。"
     },
     "providers": {
-        "description": "🔌 AI 服务商配置",
+        "description": "AI 服务商配置",
         "type": "list",
-        "hint": "服务商列表，优先级数值越小越优先。",
+        "hint": "",
         "items": {
             "name": {
                 "description": "服务商名称",
                 "type": "string",
-                "default": "新服务商"
+                "default": "grsai"
             },
             "enabled": {
                 "description": "启用",
@@ -30,8 +28,7 @@
             "base_url": {
                 "description": "Base URL",
                 "type": "string",
-                "default": "",
-                "hint": "例如 https://grsai.ai 或 https://ai.gitee.com/v1"
+                "default": "https://grsai.ai"
             },
             "api_key": {
                 "description": "API Key",
@@ -57,8 +54,7 @@
             "models": {
                 "description": "模型配置",
                 "type": "string",
-                "default": "",
-                "hint": "JSON格式：[{\"model_name\":\"nano-banana-pro\",\"triggers\":[\"bn2\"]},{\"model_name\":\"z-image-turbo\",\"triggers\":[\"zi\"]}]"
+                "default": ""
             }
         },
         "default": [
@@ -87,9 +83,9 @@
         ]
     },
     "Image-to-Prompt": {
-        "description": "🧪 Image-to-Prompt 模型配置",
+        "description": "Image-to-Prompt 模型配置",
         "type": "object",
-        "hint": "反推 会使用这里配置的 URL 与 API Key。",
+        "hint": "反推会使用这里配置的 URL 与 API Key。",
         "items": {
             "enabled": {
                 "description": "启用",
@@ -99,33 +95,29 @@
             "model": {
                 "description": "模型名称",
                 "type": "string",
-                "default": "",
-                "hint": "可留空（让接口使用默认模型）。如果接口提示 Model does not exist，请在这里填对方支持的模型名。"
+                "default": ""
             },
             "system_prompt": {
                 "description": "系统提示词",
                 "type": "string",
-                "default": "",
-                "hint": "可留空。会作为 system 消息发送。"
+                "default": ""
             },
             "primary": {
                 "description": "主提供商",
                 "type": "object",
                 "items": {
                     "api_url": {
-                        "description": "OpenAI兼容 URL",
+                        "description": "OpenAI 兼容 URL",
                         "type": "string",
-                        "default": "https://api.openai.com/v1",
-                        "hint": "填 Base URL。"
+                        "default": "https://api.openai.com/v1"
                     },
                     "api_key": {
                         "description": "API Key",
                         "type": "string",
-                        "default": "",
-                        "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                        "default": ""
                     },
                     "tls_verify": {
-                        "description": "TLS证书验证",
+                        "description": "TLS 证书验证",
                         "type": "bool",
                         "default": true
                     },
@@ -141,43 +133,28 @@
     "prompt_config": {
         "description": "提示词默认参数",
         "type": "object",
-        "hint": "若提示词中未指定参数，将使用这里的默认参数。",
+        "hint": "",
         "items": {
             "min_images": {
                 "description": "最小输入图片数量",
                 "type": "int",
-                "default": 1,
-                "hint": "如果消息携带的图片数量少于这个值，将自动添加At对象头像。"
+                "default": 1
             },
             "max_images": {
                 "description": "最大输入图片数量",
                 "type": "int",
-                "default": 6,
-                "hint": "消息中携带的图片数量超过这个值n，只取前n张图片。"
+                "default": 6
             },
             "aspect_ratio": {
                 "description": "宽高比",
                 "type": "string",
-                "options": [
-                    "default",
-                    "1:1",
-                    "2:3",
-                    "3:2",
-                    "3:4",
-                    "4:3",
-                    "9:16",
-                    "16:9"
-                ],
+                "options": ["default", "1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9"],
                 "default": "default"
             },
             "image_size": {
                 "description": "分辨率",
                 "type": "string",
-                "options": [
-                    "1K",
-                    "2K",
-                    "4K"
-                ],
+                "options": ["1K", "2K", "4K"],
                 "default": "1K"
             },
             "google_search": {
@@ -188,8 +165,7 @@
             "refer_images": {
                 "description": "参考图片",
                 "type": "string",
-                "default": "",
-                "hint": "填写格式是 文件名1,文件名2 把图片文件放在插件数据目录的 refer_images 文件夹下。"
+                "default": ""
             },
             "gather_mode": {
                 "description": "启用收集模式",
@@ -229,7 +205,7 @@
                 "default": 300
             },
             "proxy": {
-                "description": "HTTP代理",
+                "description": "HTTP 代理",
                 "type": "string",
                 "default": ""
             }
@@ -253,9 +229,9 @@
         }
     },
     "vertex_ai_anonymous_config": {
-        "description": "Vertex AI Anonymous配置项",
+        "description": "Vertex AI Anonymous 配置项",
         "type": "object",
-        "hint": "提供商配置中，除了接口规范和模型外，其他选项皆对Vertex AI Anonymous规范无效，请在此配置。",
+        "hint": "提供商配置中，除了接口规范和模型外，其他选项皆对 Vertex AI Anonymous 规范无效，请在此配置。",
         "items": {
             "recaptcha_base_api": {
                 "description": "Recaptcha Base API",
@@ -268,7 +244,7 @@
                 "default": "https://cloudconsole-pa.clients6.google.com"
             },
             "tls_verify": {
-                "description": "TLS证书校验",
+                "description": "TLS 证书校验",
                 "type": "bool",
                 "default": true
             },
@@ -287,7 +263,7 @@
     "preference_config": {
         "description": "偏好设置",
         "type": "object",
-        "hint": "以下配置因个人使用需求而异，暂无两全之策。跳过At头像的三个选项共用一个计数。",
+        "hint": "以下配置因个人使用需求而异，暂无两全之策。跳过 At 头像的三个选项共用一个计数。",
         "items": {
             "skip_at_first": {
                 "description": "跳过第一次@机器人",
@@ -300,14 +276,14 @@
                 "default": true
             },
             "skip_llm_at_first": {
-                "description": "LLM跳过第一次@机器人",
+                "description": "LLM 跳过第一次@机器人",
                 "type": "bool",
                 "default": true
             }
         }
     },
     "llm_tool_settings": {
-        "description": "LLM函数调用工具配置",
+        "description": "LLM 函数调用工具配置",
         "type": "object",
         "hint": "",
         "items": {
@@ -341,7 +317,7 @@
                 "default": false
             },
             "whitelist": {
-                "description": "群组UMO白名单",
+                "description": "群组 UMO 白名单",
                 "type": "list",
                 "default": []
             },
@@ -351,7 +327,7 @@
                 "default": false
             },
             "user_whitelist": {
-                "description": "用户ID白名单",
+                "description": "用户 ID 白名单",
                 "type": "list",
                 "default": []
             }
