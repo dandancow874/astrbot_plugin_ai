@@ -984,6 +984,35 @@ class BigBanana(Star):
                 continue
             
             providers = []
+            for provider_data in providers_data:
+                if not provider_data.get("enabled", False):
+                    continue
+                api_url = provider_data.get("api_url", "")
+                api_key = provider_data.get("api_key", "")
+                
+                p_config = ProviderConfig(
+                    name=provider_data.get("name", "Unknown"),
+                    enabled=provider_data.get("enabled", True),
+                    priority=provider_data.get("priority", 0),
+                    api_url=self._normalize_api_url(
+                        provider_data.get("api_type", ""), api_url
+                    ),
+                    api_key=api_key,
+                    api_type=provider_data.get("api_type", "OpenAI_Chat"),
+                    model=provider_data.get("model", ""),
+                    tls_verify=provider_data.get("tls_verify", True),
+                    impersonate=provider_data.get("impersonate", "chrome131"),
+                    stream=provider_data.get("stream", False),
+                )
+                providers.append(p_config)
+            
+            # Create ModelConfig
+            model_config = ModelConfig(
+                name=model_data.get("name", "Unknown"),
+                triggers=model_data.get("triggers", []),
+                providers=providers,
+                enabled=model_data.get("enabled", True),
+            )
             if model_config.enabled:
                 self.models.append(model_config)
 
