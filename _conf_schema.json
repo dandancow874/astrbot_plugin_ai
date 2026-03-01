@@ -13,7 +13,7 @@
             "name": {
                 "description": "服务商名称",
                 "type": "string",
-                "default": "grsai"
+                "default": "新服务商"
             },
             "enabled": {
                 "description": "启用",
@@ -52,9 +52,65 @@
                 "default": "chrome131"
             },
             "models": {
-                "description": "模型配置",
-                "type": "string",
-                "default": ""
+                "description": "模型列表",
+                "type": "list",
+                "hint": "可以手动添加多个模型，每个模型配置触发词",
+                "items": {
+                    "model_name": {
+                        "description": "模型名称",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "triggers": {
+                        "description": "触发词列表",
+                        "type": "list",
+                        "default": []
+                    },
+                    "default_params": {
+                        "description": "默认参数",
+                        "type": "object",
+                        "items": {
+                            "max_images": {
+                                "description": "最大输入图片数量",
+                                "type": "int",
+                                "default": 6
+                            },
+                            "image_size": {
+                                "description": "分辨率",
+                                "type": "string",
+                                "options": ["1K", "2K", "4K"],
+                                "default": "2K"
+                            },
+                            "aspect_ratio": {
+                                "description": "宽高比",
+                                "type": "string",
+                                "options": ["default", "1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9"],
+                                "default": "default"
+                            }
+                        },
+                        "default": {}
+                    }
+                },
+                "default": [
+                    {
+                        "model_name": "nano-banana-pro",
+                        "triggers": ["nbp"],
+                        "default_params": {
+                            "max_images": 6,
+                            "image_size": "2K",
+                            "aspect_ratio": "default"
+                        }
+                    },
+                    {
+                        "model_name": "nano-banana-2",
+                        "triggers": ["nb2"],
+                        "default_params": {
+                            "max_images": 6,
+                            "image_size": "2K",
+                            "aspect_ratio": "default"
+                        }
+                    }
+                ]
             }
         },
         "default": [
@@ -67,7 +123,26 @@
                 "api_type": "OpenAI_Chat",
                 "tls_verify": true,
                 "impersonate": "chrome131",
-                "models": "[{\"model_name\":\"nano-banana-pro\",\"triggers\":[\"bn2\"]}]"
+                "models": [
+                    {
+                        "model_name": "nano-banana-pro",
+                        "triggers": ["nbp"],
+                        "default_params": {
+                            "max_images": 6,
+                            "image_size": "2K",
+                            "aspect_ratio": "default"
+                        }
+                    },
+                    {
+                        "model_name": "nano-banana-2",
+                        "triggers": ["nb2"],
+                        "default_params": {
+                            "max_images": 6,
+                            "image_size": "2K",
+                            "aspect_ratio": "default"
+                        }
+                    }
+                ]
             },
             {
                 "name": "gite",
@@ -78,7 +153,26 @@
                 "api_type": "OpenAI_Images",
                 "tls_verify": true,
                 "impersonate": "chrome131",
-                "models": "[{\"model_name\":\"z-image-turbo\",\"triggers\":[\"zi\"]}]"
+                "models": [
+                    {
+                        "model_name": "z-image-turbo",
+                        "triggers": ["zimg"],
+                        "default_params": {
+                            "max_images": 6,
+                            "image_size": "2K",
+                            "aspect_ratio": "default"
+                        }
+                    },
+                    {
+                        "model_name": "FLUX.2-klein-9B",
+                        "triggers": ["kl"],
+                        "default_params": {
+                            "max_images": 6,
+                            "image_size": "2K",
+                            "aspect_ratio": "default"
+                        }
+                    }
+                ]
             }
         ]
     },
@@ -109,12 +203,14 @@
                     "api_url": {
                         "description": "OpenAI 兼容 URL",
                         "type": "string",
-                        "default": "https://api.openai.com/v1"
+                        "default": "https://api.openai.com/v1",
+                        "hint": "填 Base URL。"
                     },
                     "api_key": {
                         "description": "API Key",
                         "type": "string",
-                        "default": ""
+                        "default": "",
+                        "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
                     },
                     "tls_verify": {
                         "description": "TLS 证书验证",
@@ -214,7 +310,7 @@
     "prefix_config": {
         "description": "绘图命令触发方式",
         "type": "object",
-        "hint": "默认情况下，@机器人 将无视前缀要求。",
+        "hint": "",
         "items": {
             "coexist_enabled": {
                 "description": "混合模式",
