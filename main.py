@@ -504,6 +504,79 @@ class BigBanana(Star):
         # 这是一个临时迁移逻辑，防止用户更新后配置丢失
         # (迁移逻辑已在前面完成)
 
+
+        # 2.  ModelConfig 
+        for model_data in models_data:
+            # ȷ model_data ǵ
+            if not isinstance(model_data, dict):
+                logger.warning(f"޼Чģã{model_data}")
+                continue
+            
+            # Parse ProviderConfig list
+            providers_data = model_data.get("providers", [])
+            if not isinstance(providers_data, list):
+                logger.warning(f"ģ {model_data.get('name', 'Unknown')}  providers Ч")
+                continue
+            
+            providers = []
+            for provider_data in providers_data:
+                if not provider_data.get("enabled", False):
+                    continue
+                api_url = provider_data.get("api_url", "")
+                api_key = provider_data.get("api_key", "")
+                
+                p_config = ProviderConfig(
+                    name=provider_data.get("name", "Unknown"),
+                    enabled=provider_data.get("enabled", True),
+                    priority=provider_data.get("priority", 0),
+                    api_url=self._normalize_api_url(
+                        provider_data.get("api_type", ""), api_url
+                    ),
+                    api_key=api_key,
+                    api_type=provider_data.get("api_type", "OpenAI_Chat"),
+                    model=provider_data.get("model", ""),
+                    tls_verify=provider_data.get("tls_verify", True),
+                    impersonate=provider_data.get("impersonate", "chrome131"),
+                    stream=provider_data.get("stream", False),
+                )
+                providers.append(p_config)
+            
+            # Create ModelConfig
+            model_config = ModelConfig(
+                name=model_data.get("name", "Unknown"),
+                triggers=model_data.get("triggers", []),
+                providers=providers,
+                enabled=model_data.get("enabled", True),
+            )
+            if model_config.enabled:
+                self.models.append(model_config)
+        
+        if not self.models:
+            logger.warning("δκģͣʹ lm ģ鿴ģ")
+
+        # 3. ռҪ API ʵ
+        needed_api_types = set()
+        for model in self.models:
+            for provider in model.providers:
+                needed_api_types.add(provider.api_type)
+
+        # ʵṩ
+        for api_type in needed_api_types:
+            provider_cls = BaseProvider.get_provider_class(api_type)
+            if provider_cls is None:
+                logger.warning(
+                    f"δҵṩͶӦṩࣺ{api_type}ṩ"
+                )
+                continue
+            self.provider_map[api_type] = provider_cls(
+                config=self.conf,
+                common_config=self.common_config,
+                prompt_config=self.prompt_config,
+                session=self.http_manager._get_curl_session(),
+                downloader=self.downloader,
+                aiohttp_session=self.http_manager._get_aiohttp_session(),
+            )
+
     def init_prompts(self):
         """初始化提示词配置"""
         # 预设提示词列表
@@ -1433,6 +1506,12 @@ class BigBanana(Star):
             params.update({k: v for k, v in user_params.items() if k != "prompt"})
             params["prompt"] = final_prompt
         else:
+            # 替换 preset_prompt 中的 {{user_text}}
+            if "{{user_text}}" in preset_prompt:
+                final_prompt = preset_prompt.replace("{{user_text}}", user_prompt)
+            else:
+                final_prompt = preset_prompt
+            params["prompt"] = final_prompt
             params.update({k: v for k, v in user_params.items() if k != "prompt"})
 
         if not user_overrode_model:
