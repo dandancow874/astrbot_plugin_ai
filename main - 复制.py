@@ -483,9 +483,9 @@ class BigBanana(Star):
             import_module(f"{pkg}.core.openai_chat")
             import_module(f"{pkg}.core.gemini")
             import_module(f"{pkg}.core.vertex_ai_anonymous")
-            import_module(f"{pkg}.core.midjourney")
         except Exception:
             return
+
     def init_providers(self):
         """解析提供商配置"""
         self._ensure_provider_registry()
@@ -790,36 +790,7 @@ class BigBanana(Star):
                 "model": "Qwen-Image-Edit-2511",
                 "stream": False,
             },
-        )
-        upsert_fixed_model(
-            conf_key="midjourney_config",
-            name="Midjourney-V7",
-            default_triggers=["mj"],
-            default_provider_stub={
-                "name": "Midjourney账号",
-                "enabled": True,
-                "api_type": "Midjourney_Provider",
-                "keys": [],
-                "api_url": "https://ai.t8star.cn",
-                "model": "V 7",
-                "stream": False,
-            },
-            insert_index=3,
-        )
-        upsert_fixed_model(
-            conf_key="midjourney_config",
-            name="Midjourney-Niji7",
-            default_triggers=["nj"],
-            default_provider_stub={
-                "name": "Midjourney账号",
-                "enabled": True,
-                "api_type": "Midjourney_Provider",
-                "keys": [],
-                "api_url": "https://ai.t8star.cn",
-                "model": "niji 7",
-                "stream": False,
-            },
-            insert_index=4,
+            insert_index=2,
         )
 
 

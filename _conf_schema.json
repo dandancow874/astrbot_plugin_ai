@@ -180,6 +180,48 @@
             }
         }
     },
+    "midjourney_config": {
+        "description": "midjourney 模型配置",
+        "type": "object",
+        "hint": "mj 会使用这里配置的 URL 与 API Key。",
+        "items": {
+            "enabled": {
+                "description": "启用",
+                "type": "bool",
+                "default": true
+            },
+            "primary": {
+                "description": "主提供商",
+                "type": "object",
+                "items": {
+                    "api_url": {
+                        "description": "OpenAI兼容 URL",
+                        "type": "string",
+                        "default": "https://ai.t8star.cn",
+                        "hint": "填 Base URL，例如 https://hk-api.gptbest.vip。"
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true,
+                        "hint": "仅影响此模型的接口请求。关闭后将绕过 TLS 验证（有安全风险）。"
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131",
+                        "hint": "仅影响此模型的接口请求。用于部分逆向/反代站点的 TLS 指纹校验。"
+                    }
+                }
+            }
+        }
+    },
     "qwen_edit_2511_config": {
         "description": "🧪 Qwen-Image-Edit-2511 模型配置",
         "type": "object",
