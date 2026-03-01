@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 # 常数
@@ -31,7 +31,7 @@ class ModelInfo:
     """模型名称"""
     triggers: list[str]
     """触发词列表"""
-    default_params: ModelParams = ModelParams()
+    default_params: ModelParams = field(default_factory=ModelParams)
     """默认参数"""
 
 
