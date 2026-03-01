@@ -486,7 +486,7 @@ class BigBanana(Star):
         except Exception:
             return
 
-    def init_providers(self):
+def init_providers(self):
         """解析服务商配置"""
         self._ensure_provider_registry()
 
@@ -551,86 +551,493 @@ class BigBanana(Star):
         # 5. 配置迁移（如果需要）
         if not providers_data:
             self._migrate_legacy_config()
+        
+        # 兼容旧配置：如果 models 为空，检查是否有 extra_models 或 default_model 并迁移
+        # 这是一个临时迁移逻辑，防止用户更新后配置丢失
+        if not models_data:
+            if "extra_models" in self.conf:
+                models_data.extend(self.conf.get("extra_models", []))
+            
+            if "default_model" in self.conf:
+                default_model = self.conf.get("default_model")
+                if default_model:
+                     # 构造一个 Model 对象
+                     models_data.insert(0, {
+                         "name": "默认画图配置",
+                         "triggers": default_model.get("triggers", []),
+                         "providers": default_model.get("providers", []),
+                         "enabled": default_model.get("enabled", True)
+                     })
+            
+            # 如果从旧配置迁移了数据，保存回 models
+            if models_data:
+                self.conf["models"] = models_data
+                # 清理旧键（可选，但为了保持配置整洁最好清理）
+                self.conf.pop("extra_models", None)
+                self.conf.pop("default_model", None)
+                self.conf.save_config()
 
-    def _migrate_legacy_config(self):
-        """从旧配置迁移到新配置"""
-        providers_data = []
+        # 如果仍然为空，且是首次运行，可能会读取默认配置（由 schema 定义）
+        if not isinstance(models_data, list):
+            models_data = []
 
-        # 迁移 nanobanana_config
-        nanobanana = self.conf.get("nanobanana_config", {})
-        if isinstance(nanobanana, dict) and nanobanana.get("enabled", True):
-            primary = nanobanana.get("primary", {})
+        updated_models = False
 
-            if primary:
-                providers_data.append({
-                    "name": "grsai",
-                    "enabled": True,
-                    "priority": 0,
-                    "base_url": primary.get("api_url", "https://grsai.ai"),
-                    "api_key": primary.get("api_key", ""),
-                    "api_type": primary.get("api_type", "OpenAI_Chat"),
-                    "tls_verify": primary.get("tls_verify", True),
-                    "impersonate": primary.get("impersonate", "chrome131"),
-                    "models": [
+        def parse_keys(raw: object) -> list[str]:
+            if not isinstance(raw, str):
+                return []
+            parts = raw.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+            tokens: list[str] = []
+            for part in parts:
+                tokens.extend(part.split(","))
+            return [t.strip() for t in tokens if t.strip()]
+
+        def upsert_fixed_model(
+            conf_key: str,
+            name: str,
+            default_triggers: list[str],
+            default_provider_stub: dict,
+            insert_index: int,
+        ) -> None:
+            nonlocal updated_models, models_data
+
+            model_conf = self.conf.get(conf_key, {})
+            if not isinstance(model_conf, dict):
+                model_conf = {}
+
+            enabled = bool(model_conf.get("enabled", True))
+
+            primary_conf = model_conf.get("primary", {})
+            if not isinstance(primary_conf, dict):
+                primary_conf = {}
+
+            def build_provider_item(conf: dict, suffix: str) -> dict:
+                api_base_mapping = {
+                    "t8star": "https://ai.t8star.cn",
+                    "zhenzhen": "https://ai.t8star.cn",
+                    "hk": "https://hk-api.gptbest.vip",
+                    "us": "https://api.gptbest.vip",
+                    "grsai": "https://grsai.dakka.com.cn",
+                }
+                api_type = conf.get("api_type", None)
+                if not isinstance(api_type, str) or not api_type.strip():
+                    api_type = default_provider_stub.get("api_type")
+                api_type = str(api_type).strip()
+                if conf_key == "nanobanana_config":
+                    if suffix == "主":
+                        api_type = "OpenAI_Chat"
+                    elif suffix == "备" and not str(conf.get("api_type", "") or "").strip():
+                        api_type = "OpenAI_Images"
+
+                item = dict(default_provider_stub)
+                item["api_type"] = api_type
+
+                model_name = conf.get("model", None)
+                if isinstance(model_name, str) and model_name.strip():
+                    item["model"] = model_name.strip()
+
+                url = conf.get("api_url", model_conf.get("api_url", ""))
+                api_base = conf.get("api_base", None)
+                if isinstance(api_base, str) and api_base.strip():
+                    api_base = api_base.strip()
+                    if api_base == "ip":
+                        custom_ip = conf.get("custom_ip", None)
+                        if isinstance(custom_ip, str) and custom_ip.strip():
+                            url = custom_ip.strip()
+                    elif api_base in api_base_mapping:
+                        url = api_base_mapping[api_base]
+                item["api_url"] = url
+
+                tls_verify = conf.get("tls_verify", None)
+                if isinstance(tls_verify, bool):
+                    item["tls_verify"] = tls_verify
+                impersonate = conf.get("impersonate", None)
+                if isinstance(impersonate, str) and impersonate.strip():
+                    item["impersonate"] = impersonate.strip()
+
+                if (
+                    item.get("api_type") == "OpenAI_Chat"
+                    and isinstance(url, str)
+                    and "/images/" in url.lower()
+                ):
+                    item["api_type"] = "OpenAI_Images"
+
+                if conf_key == "zimg_config" and item.get("api_type") == "OpenAI_Images":
+                    item["api_type"] = "ZImage_Provider"
+
+                if api_type == "Vertex_AI_Anonymous":
+                    item["keys"] = []
+                    base_name = "Vertex匿名"
+                else:
+                    key = conf.get("api_key", model_conf.get("api_key", ""))
+                    item["keys"] = parse_keys(key)
+                    base_name = str(default_provider_stub.get("name", name))
+
+                item["name"] = f"{base_name}_{suffix}"
+                return item
+
+            providers = model_conf.get("providers", None)
+            if not isinstance(providers, list) or not providers:
+                provider_list: list[dict] = []
+
+                primary_data = build_provider_item(primary_conf, "主")
+                provider_list.append(primary_data)
+
+                secondary_conf = model_conf.get("secondary", {})
+                if not isinstance(secondary_conf, dict):
+                    secondary_conf = {}
+                secondary_url = secondary_conf.get("api_url", "")
+                secondary_key = secondary_conf.get("api_key", "")
+                secondary_api_type = secondary_conf.get("api_type", "")
+                secondary_model = secondary_conf.get("model", "")
+                if conf_key == "nanobanana_config" and not (
+                    str(secondary_api_type).strip()
+                    or str(secondary_url).strip()
+                    or str(secondary_key).strip()
+                    or str(secondary_model).strip()
+                ):
+                    secondary_url = "https://ai.t8star.cn"
+                    secondary_api_type = "OpenAI_Images"
+                    secondary_model = "nano-banana-2-2k"
+                if (
+                    str(secondary_api_type).strip() == "Vertex_AI_Anonymous"
+                    or str(secondary_url).strip()
+                    or str(secondary_key).strip()
+                    or str(secondary_model).strip()
+                ):
+                    secondary_data = build_provider_item(
                         {
-                            "model_name": primary.get("model", "nano-banana-pro"),
-                            "triggers": ["bn2"],
-                            "default_params": {
-                                "max_images": 6,
-                                "image_size": "2K",
-                                "aspect_ratio": "default"
-                            }
-                        }
-                    ]
-                })
+                            "api_type": secondary_api_type,
+                            "api_url": secondary_url,
+                            "api_key": secondary_key,
+                            "model": secondary_model,
+                        },
+                        "备",
+                    )
+                    provider_list.append(secondary_data)
 
-        # 迁移 zimage_config
-        zimage = self.conf.get("zimage_config", {})
-        if isinstance(zimage, dict) and zimage.get("enabled", True):
-            primary = zimage.get("primary", {})
+                providers = provider_list
 
-            if primary:
-                providers_data.append({
-                    "name": "gite",
-                    "enabled": True,
-                    "priority": 1,
-                    "base_url": primary.get("api_url", "https://ai.gitee.com/v1"),
-                    "api_key": primary.get("api_key", ""),
-                    "api_type": "OpenAI_Images",
-                    "tls_verify": primary.get("tls_verify", True),
-                    "impersonate": primary.get("impersonate", "chrome131"),
-                    "models": [
-                        {
-                            "model_name": "z-image-turbo",
-                            "triggers": ["zi"],
-                            "default_params": {
-                                "max_images": 6,
-                                "image_size": "2K",
-                                "aspect_ratio": "default"
-                            }
-                        }
-                    ]
-                })
+            if conf_key == "nanobanana_config" and isinstance(providers, list) and providers:
+                cleaned: list[dict] = []
+                for item in providers:
+                    if isinstance(item, dict):
+                        cleaned.append(item)
+                providers = cleaned
 
-        # 保存新配置
-        if providers_data:
-            self.conf["providers"] = providers_data
+                grsai_items: list[dict] = []
+                other_items: list[dict] = []
+                for item in providers:
+                    api_url = str(item.get("api_url", "") or "").strip()
+                    lowered = api_url.lower()
+                    is_grsai = "grsai" in lowered or "dakka.com.cn" in lowered
+                    if is_grsai:
+                        item.setdefault("enabled", True)
+                        item["api_type"] = "OpenAI_Chat"
+                        if not str(item.get("model", "") or "").strip():
+                            item["model"] = "nano-banana-pro"
+                        grsai_items.append(item)
+                    else:
+                        other_items.append(item)
 
-            # 清理旧配置
-            for key in [
-                "nanobanana_config",
-                "zimage_config",
-                "qwen_edit_2511_config",
-                "flow2api_config",
-                "models",
-            ]:
-                self.conf.pop(key, None)
+                if not grsai_items:
+                    key = primary_conf.get("api_key", model_conf.get("api_key", ""))
+                    injected = {
+                        "name": f"{default_provider_stub.get('name', name)}_主",
+                        "enabled": True,
+                        "api_type": "OpenAI_Chat",
+                        "keys": parse_keys(key),
+                        "api_url": "https://grsai.dakka.com.cn",
+                        "model": "nano-banana-pro",
+                        "stream": False,
+                    }
+                    tls_verify = primary_conf.get("tls_verify", None)
+                    if isinstance(tls_verify, bool):
+                        injected["tls_verify"] = tls_verify
+                    impersonate = primary_conf.get("impersonate", None)
+                    if isinstance(impersonate, str) and impersonate.strip():
+                        injected["impersonate"] = impersonate.strip()
+                    grsai_items.append(injected)
 
-            # 更新 prompt 配置
-            self.conf["prompt"] = ["反推 详细描述这张图片 --min_images 1"]
+                providers = grsai_items + other_items
 
+            triggers = default_triggers
+
+            new_data = {
+                "name": name,
+                "triggers": triggers,
+                "providers": providers,
+                "enabled": enabled,
+            }
+
+            target = next(
+                (m for m in models_data if isinstance(m, dict) and m.get("name") == name),
+                None,
+            )
+            if target is None:
+                models_data.insert(insert_index, new_data)
+                updated_models = True
+                return
+
+            if (
+                target.get("triggers") != triggers
+                or target.get("providers") != providers
+                or target.get("enabled", True) != enabled
+            ):
+                target.update(new_data)
+                updated_models = True
+
+        upsert_fixed_model(
+            conf_key="nanobanana_config",
+            name="nano-banana",
+            default_triggers=["bnn", "bnt", "bna"],
+            default_provider_stub={
+                "name": "nano-banana账号",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "https://grsai.dakka.com.cn",
+                "model": "nano-banana-pro",
+                "stream": False,
+            },
+            insert_index=0,
+        )
+        upsert_fixed_model(
+            conf_key="zimage_config",
+            name="Z-Image-Turbo",
+            default_triggers=["zimg"],
+            default_provider_stub={
+                "name": "Z-Image账号",
+                "enabled": True,
+                "api_type": "ZImage_Provider",
+                "keys": [],
+                "api_url": DEF_OPENAI_IMAGES_API_URL,
+                "model": "Z-Image-Turbo",
+                "stream": False,
+            },
+            insert_index=1,
+        )
+        upsert_fixed_model(
+            conf_key="qwen_edit_2511_config",
+            name="Qwen-Image-Edit-2511",
+            default_triggers=["edit"],
+            default_provider_stub={
+                "name": "Qwen账号",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": DEF_OPENAI_API_URL,
+                "model": "Qwen-Image-Edit-2511",
+                "stream": False,
+            },
+            insert_index=2,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api bt1 文生图 横屏",
+            default_triggers=["bt1"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "gemini-3.0-pro-image-landscape",
+                "stream": True,
+            },
+            insert_index=3,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api bt2 文生图 竖屏",
+            default_triggers=["bt2"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "gemini-3.0-pro-image-portrait",
+                "stream": True,
+            },
+            insert_index=4,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api bp1 图生图 横屏",
+            default_triggers=["bp1"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "gemini-3.0-pro-image-landscape",
+                "stream": True,
+            },
+            insert_index=5,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api bp2 图生图 竖屏",
+            default_triggers=["bp2"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "gemini-3.0-pro-image-portrait",
+                "stream": True,
+            },
+            insert_index=6,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api tv1 文生视频 横屏",
+            default_triggers=["tv1"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_1_t2v_fast_landscape",
+                "stream": True,
+            },
+            insert_index=7,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api tv2 文生视频 竖屏",
+            default_triggers=["tv2"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_1_t2v_fast_portrait",
+                "stream": True,
+            },
+            insert_index=8,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api iv1 首尾帧图生视频 横屏",
+            default_triggers=["iv1"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_1_i2v_s_fast_fl_landscape",
+                "stream": True,
+            },
+            insert_index=9,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api iv2 首尾帧图生视频 竖屏",
+            default_triggers=["iv2"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_1_i2v_s_fast_fl_portrait",
+                "stream": True,
+            },
+            insert_index=10,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api rv1 图生视频 横屏",
+            default_triggers=["rv1"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_0_r2v_fast_landscape",
+                "stream": True,
+            },
+            insert_index=11,
+        )
+        upsert_fixed_model(
+            conf_key="flow2api_config",
+            name="flow2api rv2 图生视频 竖屏",
+            default_triggers=["rv2"],
+            default_provider_stub={
+                "name": "flow2api",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": [],
+                "api_url": "http://192.168.2.109:8300/v1/chat/completions",
+                "model": "veo_3_0_r2v_fast_portrait",
+                "stream": True,
+            },
+            insert_index=12,
+        )
+
+        if updated_models:
+            self.conf["models"] = models_data
             self.conf.save_config()
-            logger.info("已从旧配置迁移到新配置")
+        
+        for model_data in models_data:
+            # Parse ProviderConfig list
+            providers_data = model_data.get("providers", [])
+            providers = []
+            for provider_data in providers_data:
+                if provider_data.get("enabled", False):
+                    # 过滤掉不在 ProviderConfig 中的字段
+                    payload = {
+                        k: v
+                        for k, v in provider_data.items()
+                        if k in ProviderConfig.__annotations__
+                    }
+                    payload.setdefault("keys", [])
+                    payload["api_url"] = self._normalize_api_url(
+                        payload.get("api_type", ""), payload.get("api_url", "")
+                    )
+                    p_config = ProviderConfig(**payload)
+                    providers.append(p_config)
+            
+            # Create ModelConfig
+            model_config = ModelConfig(
+                name=model_data.get("name", "Unknown"),
+                triggers=model_data.get("triggers", []),
+                providers=providers,
+                enabled=model_data.get("enabled", True)
+            )
+            if model_config.enabled:
+                self.models.append(model_config)
+
+        # 3. 收集所有需要的 API 类型并实例化
+        needed_api_types = set()
+        for model in self.models:
+            for provider in model.providers:
+                needed_api_types.add(provider.api_type)
+
+        # 实例化提供商类
+        for api_type in needed_api_types:
+            provider_cls = BaseProvider.get_provider_class(api_type)
+            if provider_cls is None:
+                logger.warning(
+                    f"未找到提供商类型对应的提供商类：{api_type}，跳过该提供商配置"
+                )
+                continue
+            self.provider_map[api_type] = provider_cls(
+                config=self.conf,
+                common_config=self.common_config,
+                prompt_config=self.prompt_config,
+                session=self.http_manager._get_curl_session(),
+                downloader=self.downloader,
+                aiohttp_session=self.http_manager._get_aiohttp_session(),
+            )
 
     def init_prompts(self):
         """初始化提示词配置"""

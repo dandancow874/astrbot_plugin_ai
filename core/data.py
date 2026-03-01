@@ -37,7 +37,7 @@ class ModelInfo:
 
 @dataclass(repr=False, slots=True)
 class ProviderConfig:
-    """服务商配置信息"""
+    """服务商配置信息（兼容旧结构）"""
 
     name: str
     """服务商名称"""
@@ -58,9 +58,28 @@ class ProviderConfig:
     models: list[ModelInfo] = None
     """模型列表"""
 
+    # 以下字段用于兼容旧代码
+    api_url: str | None = None
+    """API URL（兼容旧字段，与 base_url 二选一）"""
+    keys: list[str] | None = None
+    """API Keys（兼容旧字段，与 api_key 二选一）"""
+    model: str | None = None
+    """模型名称（兼容旧字段）"""
+    stream: bool = False
+    """是否启用流式响应"""
+
     def __post_init__(self):
         if self.models is None:
             self.models = []
+        # 兼容性处理
+        if self.api_url is None and self.base_url:
+            self.api_url = self.base_url
+        if self.keys is None and self.api_key:
+            self.keys = [self.api_key]
+        if self.base_url is None and self.api_url:
+            self.base_url = self.api_url
+        if self.api_key is None and self.keys and self.keys:
+            self.api_key = self.keys[0]
 
 
 @dataclass(repr=False, slots=True)
