@@ -7,10 +7,173 @@
         ],
         "hint": "只保留反推命令。"
     },
-    "providers": {
-        "description": "AI 服务商配置",
+    "models": {
+        "description": "模型配置列表（推荐结构）",
         "type": "list",
-        "hint": "",
+        "hint": "每个模型可配置多个提供商，按优先级调度",
+        "items": {
+            "name": {
+                "description": "模型名称",
+                "type": "string",
+                "default": "新模型"
+            },
+            "enabled": {
+                "description": "启用",
+                "type": "bool",
+                "default": true
+            },
+            "triggers": {
+                "description": "触发词列表",
+                "type": "list",
+                "default": []
+            },
+            "providers": {
+                "description": "提供商列表",
+                "type": "list",
+                "items": {
+                    "name": {
+                        "description": "服务商名称",
+                        "type": "string",
+                        "default": "新服务商"
+                    },
+                    "enabled": {
+                        "description": "启用",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "priority": {
+                        "description": "优先级（越小越优先）",
+                        "type": "int",
+                        "default": 0
+                    },
+                    "api_url": {
+                        "description": "API URL",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "api_type": {
+                        "description": "API 类型",
+                        "type": "string",
+                        "options": [
+                            "OpenAI_Chat",
+                            "OpenAI_Images",
+                            "Gemini",
+                            "Vertex_AI_Anonymous"
+                        ],
+                        "default": "OpenAI_Chat"
+                    },
+                    "tls_verify": {
+                        "description": "TLS 证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
+                    },
+                    "model": {
+                        "description": "模型名称（服务商端）",
+                        "type": "string",
+                        "default": ""
+                    },
+                    "stream": {
+                        "description": "流式响应",
+                        "type": "bool",
+                        "default": false
+                    }
+                },
+                "default": []
+            }
+        },
+        "default": [
+            {
+                "name": "nano-banana-pro",
+                "enabled": true,
+                "triggers": ["nbp"],
+                "providers": [
+                    {
+                        "name": "grsai",
+                        "enabled": true,
+                        "priority": 0,
+                        "api_url": "https://grsai.ai",
+                        "api_key": "sk-da2e418bb5474bff952c9f4579c5b4e0",
+                        "api_type": "OpenAI_Chat",
+                        "model": "nano-banana-pro",
+                        "tls_verify": true,
+                        "impersonate": "chrome131",
+                        "stream": false
+                    }
+                ]
+            },
+            {
+                "name": "nano-banana-2",
+                "enabled": true,
+                "triggers": ["nb2"],
+                "providers": [
+                    {
+                        "name": "grsai",
+                        "enabled": true,
+                        "priority": 0,
+                        "api_url": "https://grsai.ai",
+                        "api_key": "sk-da2e418bb5474bff952c9f4579c5b4e0",
+                        "api_type": "OpenAI_Chat",
+                        "model": "nano-banana-2",
+                        "tls_verify": true,
+                        "impersonate": "chrome131",
+                        "stream": false
+                    }
+                ]
+            },
+            {
+                "name": "z-image-turbo",
+                "enabled": true,
+                "triggers": ["zimg"],
+                "providers": [
+                    {
+                        "name": "gite",
+                        "enabled": true,
+                        "priority": 1,
+                        "api_url": "https://ai.gitee.com/v1",
+                        "api_key": "P7VWNFGGTW4TFSLHZEERAPOVC8TTJZ3JMSPKOK1L",
+                        "api_type": "OpenAI_Images",
+                        "model": "z-image-turbo",
+                        "tls_verify": true,
+                        "impersonate": "chrome131",
+                        "stream": false
+                    }
+                ]
+            },
+            {
+                "name": "FLUX.2-klein-9B",
+                "enabled": true,
+                "triggers": ["kl"],
+                "providers": [
+                    {
+                        "name": "gite",
+                        "enabled": true,
+                        "priority": 1,
+                        "api_url": "https://ai.gitee.com/v1",
+                        "api_key": "P7VWNFGGTW4TFSLHZEERAPOVC8TTJZ3JMSPKOK1L",
+                        "api_type": "OpenAI_Images",
+                        "model": "FLUX.2-klein-9B",
+                        "tls_verify": true,
+                        "impersonate": "chrome131",
+                        "stream": false
+                    }
+                ]
+            }
+        ]
+    },
+    "providers": {
+        "description": "AI 服务商配置（已废弃，仅向后兼容）",
+        "type": "list",
+        "hint": "⚠️ 已废弃：请使用顶层 models 配置。此字段仅用于兼容旧配置，不会被主动读取。",
         "items": {
             "name": {
                 "description": "服务商名称",
@@ -57,156 +220,9 @@
                 "description": "TLS/UA 指纹伪装",
                 "type": "string",
                 "default": "chrome131"
-            },
-            "models": {
-                "description": "模型列表",
-                "type": "list",
-                "hint": "可以手动添加多个模型，每个模型配置触发词",
-                "items": {
-                    "model_name": {
-                        "description": "模型名称",
-                        "type": "string",
-                        "default": ""
-                    },
-                    "triggers": {
-                        "description": "触发词列表",
-                        "type": "list",
-                        "default": []
-                    },
-                    "default_params": {
-                        "description": "默认参数",
-                        "type": "object",
-                        "items": {
-                            "max_images": {
-                                "description": "最大输入图片数量",
-                                "type": "int",
-                                "default": 6
-                            },
-                            "image_size": {
-                                "description": "分辨率",
-                                "type": "string",
-                                "options": [
-                                    "1K",
-                                    "2K",
-                                    "4K"
-                                ],
-                                "default": "2K"
-                            },
-                            "aspect_ratio": {
-                                "description": "宽高比",
-                                "type": "string",
-                                "options": [
-                                    "default",
-                                    "1:1",
-                                    "2:3",
-                                    "3:2",
-                                    "3:4",
-                                    "4:3",
-                                    "9:16",
-                                    "16:9"
-                                ],
-                                "default": "default"
-                            }
-                        },
-                        "default": {}
-                    }
-                },
-                "default": [
-                    {
-                        "model_name": "nano-banana-pro",
-                        "triggers": [
-                            "nbp"
-                        ],
-                        "default_params": {
-                            "max_images": 6,
-                            "image_size": "2K",
-                            "aspect_ratio": "default"
-                        }
-                    },
-                    {
-                        "model_name": "nano-banana-2",
-                        "triggers": [
-                            "nb2"
-                        ],
-                        "default_params": {
-                            "max_images": 6,
-                            "image_size": "2K",
-                            "aspect_ratio": "default"
-                        }
-                    }
-                ]
             }
         },
-        "default": [
-            {
-                "name": "grsai",
-                "enabled": true,
-                "priority": 0,
-                "base_url": "https://grsai.ai",
-                "api_key": "sk-da2e418bb5474bff952c9f4579c5b4e0",
-                "api_type": "OpenAI_Chat",
-                "tls_verify": true,
-                "impersonate": "chrome131",
-                "models": [
-                    {
-                        "model_name": "nano-banana-pro",
-                        "triggers": [
-                            "nbp"
-                        ],
-                        "default_params": {
-                            "max_images": 6,
-                            "image_size": "2K",
-                            "aspect_ratio": "default"
-                        }
-                    },
-                    {
-                        "model_name": "nano-banana-2",
-                        "triggers": [
-                            "nb2"
-                        ],
-                        "default_params": {
-                            "max_images": 6,
-                            "image_size": "2K",
-                            "aspect_ratio": "default"
-                        }
-                    }
-                ]
-            },
-            {
-                "name": "gite",
-                "enabled": true,
-                "priority": 1,
-                "base_url": "https://ai.gitee.com/v1",
-                "api_key": "P7VWNFGGTW4TFSLHZEERAPOVC8TTJZ3JMSPKOK1L",
-                "api_type": "OpenAI_Images",
-                "tls_verify": true,
-                "impersonate": "chrome131",
-                "models": [
-                    {
-                        "model_name": "z-image-turbo",
-                        "triggers": [
-                            "zimg"
-                        ],
-                        "default_params": {
-                            "max_images": 6,
-                            "image_size": "2K",
-                            "aspect_ratio": "default"
-                        }
-                    },
-                    {
-                        "model_name": "FLUX.2-klein-9B",
-                        "triggers": [
-                            "kl"
-                        ],
-                        "default_params": {
-                            "max_images": 6,
-                            "image_size": "2K",
-                            "aspect_ratio": "default"
-                        }
-                    }
-                ]
-            }
-        ]
+        "default": []
     },
     "Image-to-Prompt": {
         "description": "Image-to-Prompt 模型配置",
@@ -372,7 +388,7 @@
     "preference_config": {
         "description": "偏好设置",
         "type": "object",
-        "hint": "以下配置因个人使用需求而异，暂无两全之策。跳过 At 头像的三个选项共用一个计数。",
+        "hint": "以下配置因个人使用需求而异。跳过 At 头像的三个选项共用一个计数。",
         "items": {
             "skip_at_first": {
                 "description": "跳过第一次@机器人",

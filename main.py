@@ -939,45 +939,10 @@ class BigBanana(Star):
             insert_index=12,
         )
 
-        # === 新增：从 providers[].models 提取模型配置 ===
-        # 如果 models_data 为空，尝试从 providers 结构中提取
+        # 不再从 providers[].models 提取，因为新结构已统一使用顶层 models[]
+        # 如果 models_data 为空，说明用户还没有配置任何模型
         if not models_data:
-            providers_raw = self.conf.get("providers", [])
-            if isinstance(providers_raw, list):
-                for prov in providers_raw:
-                    if not isinstance(prov, dict):
-                        continue
-                    prov_models = prov.get("models", [])
-                    if not isinstance(prov_models, list):
-                        continue
-                    for mi in prov_models:
-                        if not isinstance(mi, dict):
-                            continue
-                        model_name = mi.get("model_name", "")
-                        triggers = mi.get("triggers", [])
-                        if not model_name or not triggers:
-                            continue
-                        # 构建 provider 配置项（继承父级 provider 配置）
-                        provider_item = {
-                            "name": prov.get("name", "Unknown"),
-                            "enabled": prov.get("enabled", True),
-                            "priority": prov.get("priority", 0),
-                            "api_url": prov.get("base_url", ""),
-                            "api_key": prov.get("api_key", ""),
-                            "api_type": prov.get("api_type", "OpenAI_Chat"),
-                            "tls_verify": prov.get("tls_verify", True),
-                            "impersonate": prov.get("impersonate", "chrome131"),
-                            "model": model_name,
-                            "stream": False,
-                        }
-                        # 使用 model_name 作为模型名称
-                        models_data.append({
-                            "name": model_name,
-                            "triggers": triggers,
-                            "providers": [provider_item],
-                            "enabled": True,
-                        })
-
+            logger.info("未配置任何模型，请使用 lm 模型列表命令查看并添加模型配置")
         if updated_models:
             self.conf["models"] = models_data
             self.conf.save_config()
@@ -987,29 +952,24 @@ class BigBanana(Star):
             providers = []
             for provider_data in providers_data:
                 if provider_data.get("enabled", False):
-                    # 获取关键字段（用于 setdefault）
-                    base_url = provider_data.get("api_url", "")
+                    api_url = provider_data.get("api_url", "")
                     api_key = provider_data.get("api_key", "")
-
-                    # 直接构建 payload，不使用过滤
-                    payload = {
-                        "name": provider_data.get("name", "Unknown"),
-                        "enabled": provider_data.get("enabled", True),
-                        "priority": provider_data.get("priority", 0),
-                        "base_url": base_url,
-                        "api_key": api_key,
-                        "api_type": provider_data.get("api_type", "OpenAI_Chat"),
-                        "tls_verify": provider_data.get("tls_verify", True),
-                        "impersonate": provider_data.get("impersonate", "chrome131"),
-                        # 兼容字段
-                        "keys": [api_key] if api_key else [],
-                        "api_url": self._normalize_api_url(
-                            provider_data.get("api_type", ""), base_url
+                    
+                    # 构建简化的 ProviderConfig，不再需要兼容字段
+                    p_config = ProviderConfig(
+                        name=provider_data.get("name", "Unknown"),
+                        enabled=provider_data.get("enabled", True),
+                        priority=provider_data.get("priority", 0),
+                        api_url=self._normalize_api_url(
+                            provider_data.get("api_type", ""), api_url
                         ),
-                        "model": provider_data.get("model", ""),
-                        "stream": provider_data.get("stream", False),
-                    }
-                    p_config = ProviderConfig(**payload)
+                        api_key=api_key,
+                        api_type=provider_data.get("api_type", "OpenAI_Chat"),
+                        model=provider_data.get("model", ""),
+                        tls_verify=provider_data.get("tls_verify", True),
+                        impersonate=provider_data.get("impersonate", "chrome131"),
+                        stream=provider_data.get("stream", False),
+                    )
                     providers.append(p_config)
 
             # Create ModelConfig
