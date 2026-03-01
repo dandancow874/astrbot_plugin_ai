@@ -57,47 +57,9 @@
             },
             "models": {
                 "description": "模型列表",
-                "type": "list",
-                "hint": "每个模型可配置自定义触发词。文生图/图生图自动识别，不需要配置 min_images。",
-                "items": {
-                    "model_name": {
-                        "description": "模型名称",
-                        "type": "string",
-                        "default": "",
-                        "hint": "例如 nano-banana-pro"
-                    },
-                    "triggers": {
-                        "description": "触发词列表",
-                        "type": "list",
-                        "default": [],
-                        "hint": "完全自定义，例如 [\"bn2\", \"画图\"]"
-                    },
-                    "default_params": {
-                        "description": "默认参数",
-                        "type": "object",
-                        "items": {
-                            "max_images": {
-                                "description": "最大输入图片数量",
-                                "type": "int",
-                                "default": 6
-                            },
-                            "image_size": {
-                                "description": "分辨率",
-                                "type": "string",
-                                "options": ["1K", "2K", "4K"],
-                                "default": "2K"
-                            },
-                            "aspect_ratio": {
-                                "description": "宽高比",
-                                "type": "string",
-                                "options": ["default", "1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9"],
-                                "default": "default"
-                            }
-                        },
-                        "default": {}
-                    }
-                },
-                "default": []
+                "type": "string",
+                "hint": "JSON格式配置。示例：[{\"model_name\": \"nano-banana-pro\", \"triggers\": [\"bn2\", \"画图\"], \"default_params\": {\"max_images\": 6, \"image_size\": \"2K\"}}]",
+                "default": "[{\"model_name\": \"nano-banana-pro\", \"triggers\": [\"bn2\"]}]"
             }
         },
         "default": [
@@ -110,17 +72,7 @@
                 "api_type": "OpenAI_Chat",
                 "tls_verify": true,
                 "impersonate": "chrome131",
-                "models": [
-                    {
-                        "model_name": "nano-banana-pro",
-                        "triggers": ["bn2"],
-                        "default_params": {
-                            "max_images": 6,
-                            "image_size": "2K",
-                            "aspect_ratio": "default"
-                        }
-                    }
-                ]
+                "models": "[{\"model_name\": \"nano-banana-pro\", \"triggers\": [\"bn2\"]}]"
             },
             {
                 "name": "gite",
@@ -131,17 +83,7 @@
                 "api_type": "OpenAI_Images",
                 "tls_verify": true,
                 "impersonate": "chrome131",
-                "models": [
-                    {
-                        "model_name": "z-image-turbo",
-                        "triggers": ["zi"],
-                        "default_params": {
-                            "max_images": 6,
-                            "image_size": "2K",
-                            "aspect_ratio": "default"
-                        }
-                    }
-                ]
+                "models": "[{\"model_name\": \"z-image-turbo\", \"triggers\": [\"zi\"]}]"
             }
         ]
     },
