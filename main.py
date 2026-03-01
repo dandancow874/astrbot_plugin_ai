@@ -7,7 +7,7 @@ import re
 import astrbot.api.message_components as Comp
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.star import Context, Star, StarTools
+from astrbot.api.star import Context, Star, StarTools, register # 加上 register
 from astrbot.core import AstrBotConfig
 from astrbot.core.message.components import BaseMessageComponent
 from astrbot.core.message.message_event_result import MessageChain
@@ -74,6 +74,7 @@ MAX_SIZE_B64_LEN = int(MAX_SIZE_BYTES * 4 / 3)
 
 __all__ = ["BigBanana"]
 
+@register("big_banana", "dandancow874", "图片生成插件", "0.2.2")
 class BigBanana(Star):
     MAX_CONCURRENT_JOBS = 8
 
