@@ -503,7 +503,6 @@ class BigBanana(Star):
 
         # 这是一个临时迁移逻辑，防止用户更新后配置丢失
         # (迁移逻辑已在前面完成)
-            )
 
     def init_prompts(self):
         """初始化提示词配置"""
