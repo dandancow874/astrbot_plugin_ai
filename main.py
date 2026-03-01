@@ -747,7 +747,8 @@ class BigBanana(Star):
                         for k, v in provider_data.items()
                         if k in ProviderConfig.__annotations__
                     }
-                    payload.setdefault("keys", [])
+                    payload.setdefault("api_key", "")
+                    payload.setdefault("priority", 0)
                     payload["api_url"] = self._normalize_api_url(
                         payload.get("api_type", ""), payload.get("api_url", "")
                     )
@@ -1735,22 +1736,6 @@ class BigBanana(Star):
                 # 无论配置如何，如果没有配置，默认都是 nano-banana-pro
                 params["model"] = str(default_model).strip() if str(default_model or "").strip() else "nano-banana-pro"
         if is_nanobanana:
-            if (
-                self.nanobanana_group_whitelist_enabled
-                and event.unified_msg_origin not in self.nanobanana_group_whitelist
-            ):
-                logger.info(
-                    f"群 {event.unified_msg_origin} 不在 nano-banana 白名单内，跳过处理"
-                )
-                return
-            if (
-                self.nanobanana_user_whitelist_enabled
-                and event.get_sender_id() not in self.nanobanana_user_whitelist
-            ):
-                logger.info(
-                    f"用户 {event.get_sender_id()} 不在 nano-banana 白名单内，跳过处理"
-                )
-                return
 
         if cmd == "反推":
             min_required_images = params.get("min_images", self.prompt_config.min_images)
