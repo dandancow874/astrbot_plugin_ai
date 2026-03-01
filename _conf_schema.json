@@ -3,7 +3,11 @@
     "description": "预设提示词",
     "type": "list",
     "default": [
-      "反推 详细描述这张图片 --min_images 1"
+      "反推 详细描述这张图片 --min_images 1",
+      "zimg {{user_text}}",
+      "nb2 {{user_text}}",
+      "nbp {{user_text}}",
+      "kl {{user_text}}"
     ],
     "hint": "只保留反推命令。"
   },
