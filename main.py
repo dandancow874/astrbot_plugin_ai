@@ -490,39 +490,65 @@ class BigBanana(Star):
 
         # 1. 获取模型配置列表
         models_data = self.conf.get("models", [])
+        
+        # 确保 models_data 是列表
+        if not isinstance(models_data, list):
+            logger.warning("models 配置格式错误，应为列表")
+            models_data = []
+        
+        # 兼容旧配置：如果 models 为空或配置不正确，尝试从 providers[].models 迁移
+        if not models_data:
+            providers_raw = self.conf.get("providers", [])
+            if isinstance(providers_raw, list):
+                migrated_count = 0
+                for prov in providers_raw:
+                    if not isinstance(prov, dict):
+                        continue
+                    prov_models = prov.get("models", [])
+                    if not isinstance(prov_models, list):
+                        continue
+                    for mi in prov_models:
+                        if not isinstance(mi, dict):
+                            continue
+                        model_name = mi.get("model_name", "")
+                        triggers = mi.get("triggers", [])
+                        if not model_name:
+                            continue
+                        models_data.append({
+                            "name": model_name,
+                            "triggers": triggers if triggers else [model_name.lower()],
+                            "providers": [{
+                                "name": prov.get("name", "Unknown"),
+                                "enabled": prov.get("enabled", True),
+                                "priority": prov.get("priority", 0),
+                                "api_url": prov.get("base_url", ""),
+                                "api_key": prov.get("api_key", ""),
+                                "api_type": prov.get("api_type", "OpenAI_Chat"),
+                                "tls_verify": prov.get("tls_verify", True),
+                                "impersonate": prov.get("impersonate", "chrome131"),
+                                "model": model_name,
+                                "stream": False,
+                            }],
+                            "enabled": True,
+                        })
+                        migrated_count += 1
+                
+                if migrated_count > 0:
+                    logger.info(f"自动迁移旧配置：{migrated_count} 个模型")
+                    self.conf["models"] = models_data
+                    # 清空旧的 providers[].models 避免重复迁移
+                    for prov in self.conf.get("providers", []):
+                        if isinstance(prov, dict) and "models" in prov:
+                            prov["models"] = []
+                    self.conf.save_config()
+        # 确保 models_data 是列表
+        if not isinstance(models_data, list):
+            logger.warning("models 配置格式错误，应为列表")
+            models_data = []
 
         # 兼容旧配置：如果 models 为空，检查是否有 extra_models 或 default_model 并迁移
         # 这是一个临时迁移逻辑，防止用户更新后配置丢失
         if not models_data:
-            if "extra_models" in self.conf:
-                models_data.extend(self.conf.get("extra_models", []))
-
-            if "default_model" in self.conf:
-                default_model = self.conf.get("default_model")
-                if default_model:
-                    # 构造一个 Model 对象
-                    models_data.insert(
-                        0,
-                        {
-                            "name": "默认画图配置",
-                            "triggers": default_model.get("triggers", []),
-                            "providers": default_model.get("providers", []),
-                            "enabled": default_model.get("enabled", True),
-                        },
-                    )
-
-            # 如果从旧配置迁移了数据，保存回 models
-            if models_data:
-                self.conf["models"] = models_data
-                # 清理旧键（可选，但为了保持配置整洁最好清理）
-                self.conf.pop("extra_models", None)
-                self.conf.pop("default_model", None)
-                self.conf.save_config()
-
-        # 如果仍然为空，且是首次运行，可能会读取默认配置（由 schema 定义）
-        if not isinstance(models_data, list):
-            models_data = []
-
         updated_models = False
 
         def parse_keys(raw: object) -> list[str]:
@@ -947,38 +973,18 @@ class BigBanana(Star):
             self.conf["models"] = models_data
             self.conf.save_config()
         for model_data in models_data:
+            # 确保 model_data 是字典
+            if not isinstance(model_data, dict):
+                logger.warning(f"跳过无效的模型配置：{model_data}")
+                continue
+            
             # Parse ProviderConfig list
             providers_data = model_data.get("providers", [])
+            if not isinstance(providers_data, list):
+                logger.warning(f"模型 {model_data.get('name', 'Unknown')} 的 providers 配置无效")
+                continue
+            
             providers = []
-            for provider_data in providers_data:
-                if provider_data.get("enabled", False):
-                    api_url = provider_data.get("api_url", "")
-                    api_key = provider_data.get("api_key", "")
-                    
-                    # 构建简化的 ProviderConfig，不再需要兼容字段
-                    p_config = ProviderConfig(
-                        name=provider_data.get("name", "Unknown"),
-                        enabled=provider_data.get("enabled", True),
-                        priority=provider_data.get("priority", 0),
-                        api_url=self._normalize_api_url(
-                            provider_data.get("api_type", ""), api_url
-                        ),
-                        api_key=api_key,
-                        api_type=provider_data.get("api_type", "OpenAI_Chat"),
-                        model=provider_data.get("model", ""),
-                        tls_verify=provider_data.get("tls_verify", True),
-                        impersonate=provider_data.get("impersonate", "chrome131"),
-                        stream=provider_data.get("stream", False),
-                    )
-                    providers.append(p_config)
-
-            # Create ModelConfig
-            model_config = ModelConfig(
-                name=model_data.get("name", "Unknown"),
-                triggers=model_data.get("triggers", []),
-                providers=providers,
-                enabled=model_data.get("enabled", True),
-            )
             if model_config.enabled:
                 self.models.append(model_config)
 
