@@ -484,6 +484,17 @@ class BigBanana(Star):
             import_module(f"{pkg}.core.gemini")
             import_module(f"{pkg}.core.vertex_ai_anonymous")
             import_module(f"{pkg}.core.midjourney")
+        except Exception as e:
+            logger.warning(f"_ensure_provider_registry 导入失败: {e}")
+            return
+        try:
+            from importlib import import_module
+
+            pkg = __package__ or "astrbot_plugin_ai"
+            import_module(f"{pkg}.core.openai_chat")
+            import_module(f"{pkg}.core.gemini")
+            import_module(f"{pkg}.core.vertex_ai_anonymous")
+            import_module(f"{pkg}.core.midjourney")
         except Exception:
             return
     def init_providers(self):
@@ -833,7 +844,7 @@ class BigBanana(Star):
             providers_data = model_data.get("providers", [])
             providers = []
             for provider_data in providers_data:
-                if provider_data.get("enabled", False):
+                if provider_data.get("enabled", True):  # 默认为 True
                     # 过滤掉不在 ProviderConfig 中的字段
                     payload = {
                         k: v
