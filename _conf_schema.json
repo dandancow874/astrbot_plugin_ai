@@ -22,25 +22,41 @@
                 "type": "bool",
                 "default": true
             },
+            "whitelist": {
+                "description": "nano-banana 白名单配置",
+                "type": "object",
+                "hint": "对最终使用 nano-banana 的请求生效（包括通过预设/--preset 间接调用）。",
+                "items": {
+                    "enabled": {
+                        "description": "启用群组白名单",
+                        "type": "bool",
+                        "default": false,
+                        "hint": "开启后，只有在白名单内的群组可以使用 nano-banana。"
+                    },
+                    "whitelist": {
+                        "description": "群组UMO白名单",
+                        "type": "list",
+                        "default": [],
+                        "hint": "白名单群组UMO列表，可在对应群内使用/sid获取。要把UMO写完整。"
+                    },
+                    "user_enabled": {
+                        "description": "启用用户白名单",
+                        "type": "bool",
+                        "default": false,
+                        "hint": "开启后，只有在白名单内的用户可以使用 nano-banana。"
+                    },
+                    "user_whitelist": {
+                        "description": "用户ID白名单",
+                        "type": "list",
+                        "default": [],
+                        "hint": "用户QQ号列表"
+                    }
+                }
+            },
             "primary": {
                 "description": "主提供商",
                 "type": "object",
                 "items": {
-                    "custom_ip": {
-                        "description": "自定义 Base URL",
-                        "type": "string",
-                        "default": "",
-                        "hint": "当 api_base=ip 时填写，例如 https://grsai.dakka.com.cn 或 https://ai.t8star.cn。"
-                    },
-                    "api_type": {
-                        "description": "接口类型",
-                        "type": "string",
-                        "options": [
-                            "OpenAI_Chat"
-                        ],
-                        "default": "OpenAI_Chat",
-                        "hint": ""
-                    },
                     "api_url": {
                         "description": "OpenAI兼容 Base URL",
                         "type": "string",
@@ -62,14 +78,12 @@
                     "tls_verify": {
                         "description": "TLS证书验证",
                         "type": "bool",
-                        "default": true,
-                        "hidden": true
+                        "default": true
                     },
                     "impersonate": {
                         "description": "TLS/UA 指纹伪装",
                         "type": "string",
-                        "default": "chrome131",
-                        "hidden": true
+                        "default": "chrome131"
                     }
                 }
             }
@@ -105,15 +119,13 @@
                         "description": "TLS证书验证",
                         "type": "bool",
                         "default": true,
-                        "hint": "仅影响此模型的接口请求。关闭后将绕过 TLS 验证（有安全风险）。",
-                        "hidden": true
+                        "hint": "仅影响此模型的接口请求。关闭后将绕过 TLS 验证（有安全风险）。"
                     },
                     "impersonate": {
                         "description": "TLS/UA 指纹伪装",
                         "type": "string",
                         "default": "chrome131",
-                        "hint": "仅影响此模型的接口请求。用于部分逆向/反代站点的 TLS 指纹校验。",
-                        "hidden": true
+                        "hint": "仅影响此模型的接口请求。用于部分逆向/反代站点的 TLS 指纹校验。"
                     }
                 }
             }
@@ -190,14 +202,12 @@
                     "tls_verify": {
                         "description": "TLS证书验证",
                         "type": "bool",
-                        "default": true,
-                        "hidden": true
+                        "default": true
                     },
                     "impersonate": {
                         "description": "TLS/UA 指纹伪装",
                         "type": "string",
-                        "default": "chrome131",
-                        "hidden": true
+                        "default": "chrome131"
                     }
                 }
             }
@@ -273,15 +283,13 @@
                         "description": "TLS证书验证",
                         "type": "bool",
                         "default": true,
-                        "hint": "关闭后将绕过 TLS 验证（有安全风险）。",
-                        "hidden": true
+                        "hint": "关闭后将绕过 TLS 验证（有安全风险）。"
                     },
                     "impersonate": {
                         "description": "TLS/UA 指纹伪装",
                         "type": "string",
                         "default": "",
-                        "hint": "用于部分逆向/反代站点的 TLS 指纹校验。例如 chrome131。留空表示不启用。",
-                        "hidden": true
+                        "hint": "用于部分逆向/反代站点的 TLS 指纹校验。例如 chrome131。留空表示不启用。"
                     }
                 }
             }
@@ -438,8 +446,7 @@
                 "description": "TLS证书校验",
                 "type": "bool",
                 "default": true,
-                "hint": "关闭可绕过证书错误（例如 curl: (60)），但存在安全风险。",
-                "hidden": true
+                "hint": "关闭可绕过证书错误（例如 curl: (60)），但存在安全风险。"
             },
             "system_prompt": {
                 "description": "系统提示词",

@@ -894,7 +894,7 @@ class OpenAIImagesProvider(BaseProvider):
                 name=provider_config.name,
                 enabled=provider_config.enabled,
                 api_type=provider_config.api_type,
-                api_key=provider_config.api_key,
+                keys=provider_config.keys,
                 api_url=resolved_url,
                 model=provider_config.model,
                 stream=provider_config.stream,
