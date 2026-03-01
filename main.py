@@ -7,7 +7,7 @@ import re
 import astrbot.api.message_components as Comp
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.star import Context, Star, StarTools, register # 加上 register
+from astrbot.api.star import Context, Star, StarTools
 from astrbot.core import AstrBotConfig
 from astrbot.core.message.components import BaseMessageComponent
 from astrbot.core.message.message_event_result import MessageChain
@@ -72,9 +72,6 @@ MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 MAX_SIZE_B64_LEN = int(MAX_SIZE_BYTES * 4 / 3)
 
 
-__all__ = ["BigBanana"]
-
-@register("big_banana", "dandancow874", "图片生成插件", "0.2.2")
 class BigBanana(Star):
     MAX_CONCURRENT_JOBS = 8
 
@@ -738,7 +735,7 @@ class BigBanana(Star):
         upsert_fixed_model(
             conf_key="nano-banana-2_config",
             name="nano-banana-2",
-            default_triggers=["bt1", "bt2", "bt3"],
+            default_triggers=["bt2", "bt1", "bt3"],
             default_provider_stub={
                 "name": "nano-banana-2账号",
                 "enabled": True,
@@ -752,8 +749,8 @@ class BigBanana(Star):
         )
         upsert_fixed_model(
             conf_key="nanobanana_config",
-            name="nano-banana-pro",
-            default_triggers=["bnn", "bnt", "bna"],
+            name="nano-banana",
+            default_triggers=["bp2", "bp1", "bp3"],
             default_provider_stub={
                 "name": "nano-banana账号",
                 "enabled": True,
@@ -795,6 +792,7 @@ class BigBanana(Star):
             },
             insert_index=2,
         )
+
 
 
         if updated_models:
@@ -865,7 +863,21 @@ class BigBanana(Star):
                 existing_cmds.add(cmd)
                 self.prompt_dict[cmd] = params
 
+        fixed_prompts: dict[str, str] = {
 
+        }
+        updated_prompts = False
+        for trigger, prompt_line in fixed_prompts.items():
+            if trigger in existing_cmds:
+                continue
+            cmd_list, params = self.parsing_prompt_params(prompt_line)
+            self.prompt_list.append(prompt_line)
+            updated_prompts = True
+            for cmd in cmd_list:
+                existing_cmds.add(cmd)
+                self.prompt_dict[cmd] = params
+
+        # 将模型触发词也加入到 prompt_dict 中，以便在 on_message 中能通过检查
         # 如果触发词已存在（即有预设提示词），则不做处理（预设提示词优先）
         # 如果触发词不存在，则添加一个默认的提示词配置
         if hasattr(self, "models"):
@@ -1748,23 +1760,49 @@ class BigBanana(Star):
             new_prompt = preset_prompt.replace("{{user_text}}", user_prompt)
             params["prompt"] = new_prompt
 
-        if cmd in {"iv1", "iv2"} and not user_overrode_min_images:
-            params["min_images"] = 2
+
         if cmd == "zimg" and not user_overrode_image_size:
             params["image_size"] = "2K"
 
-
-        is_nanobanana = params.get("__model_name__") == "nano-banana-pro" or cmd in {
-            "bnn",
-            "bnt",
-            "bna",
+        is_nanobanana = params.get("__model_name__") == "nano-banana-2" or cmd in {
+            "bt2",
+            "bt1",
+            "bt3",
         }
-        if cmd in {"bnn", "bnt", "bna"}:
-            params["__model_name__"] = "nano-banana-pro]"
+        if cmd in {"bt2", "bt1", "bt3"}:
+            params["__model_name__"] = "nano-banana-2"
             
-            # 强制设置 image_size 为 2K（如果未指定且是 bnn 命令）
+            # 强制设置 image_size 为 2K（如果未指定且是 bp2 命令）
             user_overrode_image_size = "image_size" in params and params["image_size"] is not None
-            if cmd == "bnn" and not user_overrode_image_size:
+            if cmd == "bt1" and not user_overrode_image_size:
+                params["image_size"] = "2K"
+            
+            # 模型选择逻辑：如果没有覆盖，优先使用配置，其次强制使用 nano-banana-pro
+            if not user_overrode_model and not str(params.get("model", "") or "").strip():
+                nanobanana_conf = self.conf.get("nanobanana_config", {})
+                primary_conf = (
+                    nanobanana_conf.get("primary", {}) if isinstance(nanobanana_conf, dict) else {}
+                )
+                default_model = (
+                    primary_conf.get("model", None) if isinstance(primary_conf, dict) else None
+                )
+                # 无论配置如何，如果没有配置，默认都是 nano-banana-pro
+                params["model"] = str(default_model).strip() if str(default_model or "").strip() else "nano-banana-2"
+
+
+
+
+        is_nanobanana = params.get("__model_name__") == "nano-banana" or cmd in {
+            "bp2",
+            "bp1",
+            "bp3",
+        }
+        if cmd in {"bp2", "bp1", "bp3"}:
+            params["__model_name__"] = "nano-banana-pro"
+            
+            # 强制设置 image_size 为 2K（如果未指定且是 bp2 命令）
+            user_overrode_image_size = "image_size" in params and params["image_size"] is not None
+            if cmd == "bp2" and not user_overrode_image_size:
                 params["image_size"] = "2K"
             
             # 模型选择逻辑：如果没有覆盖，优先使用配置，其次强制使用 nano-banana-pro
@@ -2005,7 +2043,7 @@ class BigBanana(Star):
                         )
 
         trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
-        is_i2i_mode = trigger_cmd in {"bp1", "bp2", "edit"}
+        is_i2i_mode = trigger_cmd in {"bp2", "edit","bt2"}
         if (
             is_i2i_mode
             and not image_urls
@@ -2238,7 +2276,7 @@ class BigBanana(Star):
         if (
             not model_name
             and not target_model
-            and requested_provider_model in {"nano-banana-pro", "nano-banana"}
+            and requested_provider_model in {"nano-banana-pro", "nano-banana-2"}
             and self.models
         ):
             for model in self.models:
@@ -2378,7 +2416,7 @@ class BigBanana(Star):
                 and ("grsai" in (provider.api_url or "").lower() or "dakka.com.cn" in (provider.api_url or "").lower())
             ):
                 # 检查是否为 nano-banana-pro 模型，如果是且未指定 image_size，则强制设置为 2K
-                # 这里的逻辑涵盖了 bnn 命令之外的调用（如预设提示词）
+                # 这里的逻辑涵盖了 bp2 命令之外的调用（如预设提示词）
                 current_model = (params_model or provider_model).strip()
                 if current_model == "nano-banana-pro":
                     if "image_size" not in call_params or not call_params["image_size"]:
