@@ -84,9 +84,7 @@ class BigBanana(Star):
         if url and not re.match(r"^https?://", url, flags=re.I):
             raw_no_scheme = url.lstrip("/")
             lowered_no_scheme = raw_no_scheme.lower()
-            if lowered_no_scheme.startswith(
-                "grsai.dakka.com.cn"
-            ) or lowered_no_scheme.startswith("ai.t8star.cn"):
+            if lowered_no_scheme.startswith("grsai.dakka.com.cn") or lowered_no_scheme.startswith("ai.t8star.cn"):
                 url = "https://" + raw_no_scheme
         url = url.rstrip(",，)）】】]}")
         url = url.lstrip("`'\"([{【")
@@ -251,9 +249,7 @@ class BigBanana(Star):
             if u.startswith("http") and u.lower().endswith(SUPPORTED_FILE_FORMATS):
                 urls.append(u)
                 return
-            if u.startswith("http") and any(
-                ext in u.lower() for ext in SUPPORTED_FILE_FORMATS
-            ):
+            if u.startswith("http") and any(ext in u.lower() for ext in SUPPORTED_FILE_FORMATS):
                 urls.append(u)
 
         if isinstance(message, list):
@@ -375,9 +371,7 @@ class BigBanana(Star):
             choices = result.get("choices") if isinstance(result, dict) else None
             if not isinstance(choices, list) or not choices:
                 return "❌ 反推失败：响应缺少 choices"
-            message = (
-                choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
-            )
+            message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
             content = message.get("content", "")
             if isinstance(content, list):
                 parts: list[str] = []
@@ -499,30 +493,27 @@ class BigBanana(Star):
         self.models: list[ModelConfig] = []
         # 提供商实例映射
         self.provider_map: dict[str, BaseProvider] = {}
-
+        
         # 1. 获取模型配置列表
         models_data = self.conf.get("models", [])
-
+        
         # 兼容旧配置：如果 models 为空，检查是否有 extra_models 或 default_model 并迁移
         # 这是一个临时迁移逻辑，防止用户更新后配置丢失
         if not models_data:
             if "extra_models" in self.conf:
                 models_data.extend(self.conf.get("extra_models", []))
-
+            
             if "default_model" in self.conf:
                 default_model = self.conf.get("default_model")
                 if default_model:
-                    # 构造一个 Model 对象
-                    models_data.insert(
-                        0,
-                        {
-                            "name": "默认画图配置",
-                            "triggers": default_model.get("triggers", []),
-                            "providers": default_model.get("providers", []),
-                            "enabled": default_model.get("enabled", True),
-                        },
-                    )
-
+                     # 构造一个 Model 对象
+                     models_data.insert(0, {
+                         "name": "默认画图配置",
+                         "triggers": default_model.get("triggers", []),
+                         "providers": default_model.get("providers", []),
+                         "enabled": default_model.get("enabled", True)
+                     })
+            
             # 如果从旧配置迁移了数据，保存回 models
             if models_data:
                 self.conf["models"] = models_data
@@ -580,10 +571,7 @@ class BigBanana(Star):
                 if conf_key == "nanobanana_config":
                     if suffix == "主":
                         api_type = "OpenAI_Chat"
-                    elif (
-                        suffix == "备"
-                        and not str(conf.get("api_type", "") or "").strip()
-                    ):
+                    elif suffix == "备" and not str(conf.get("api_type", "") or "").strip():
                         api_type = "OpenAI_Images"
 
                 item = dict(default_provider_stub)
@@ -619,10 +607,7 @@ class BigBanana(Star):
                 ):
                     item["api_type"] = "OpenAI_Images"
 
-                if (
-                    conf_key == "zimg_config"
-                    and item.get("api_type") == "OpenAI_Images"
-                ):
+                if conf_key == "zimg_config" and item.get("api_type") == "OpenAI_Images":
                     item["api_type"] = "ZImage_Provider"
 
                 if api_type == "Vertex_AI_Anonymous":
@@ -678,11 +663,7 @@ class BigBanana(Star):
 
                 providers = provider_list
 
-            if (
-                conf_key == "nanobanana_config"
-                and isinstance(providers, list)
-                and providers
-            ):
+            if conf_key == "nanobanana_config" and isinstance(providers, list) and providers:
                 cleaned: list[dict] = []
                 for item in providers:
                     if isinstance(item, dict):
@@ -735,11 +716,7 @@ class BigBanana(Star):
             }
 
             target = next(
-                (
-                    m
-                    for m in models_data
-                    if isinstance(m, dict) and m.get("name") == name
-                ),
+                (m for m in models_data if isinstance(m, dict) and m.get("name") == name),
                 None,
             )
             if target is None:
@@ -954,7 +931,7 @@ class BigBanana(Star):
         if updated_models:
             self.conf["models"] = models_data
             self.conf.save_config()
-
+        
         for model_data in models_data:
             # Parse ProviderConfig list
             providers_data = model_data.get("providers", [])
@@ -967,23 +944,19 @@ class BigBanana(Star):
                         for k, v in provider_data.items()
                         if k in ProviderConfig.__annotations__
                     }
-                    # 添加必需字段的默认值
-                    payload.setdefault("priority", 0)
-                    payload.setdefault("base_url", "")
-                    payload.setdefault("api_key", "")
                     payload.setdefault("keys", [])
                     payload["api_url"] = self._normalize_api_url(
                         payload.get("api_type", ""), payload.get("api_url", "")
                     )
                     p_config = ProviderConfig(**payload)
                     providers.append(p_config)
-
+            
             # Create ModelConfig
             model_config = ModelConfig(
                 name=model_data.get("name", "Unknown"),
                 triggers=model_data.get("triggers", []),
                 providers=providers,
-                enabled=model_data.get("enabled", True),
+                enabled=model_data.get("enabled", True)
             )
             if model_config.enabled:
                 self.models.append(model_config)
@@ -1010,51 +983,6 @@ class BigBanana(Star):
                 downloader=self.downloader,
                 aiohttp_session=self.http_manager._get_aiohttp_session(),
             )
-
-        # 6. 加载新的 providers 配置
-        providers_data = self.conf.get("providers", [])
-        if isinstance(providers_data, list) and providers_data:
-            for provider_data in providers_data:
-                if not provider_data.get("enabled", False):
-                    continue
-
-                # 解析 models 配置（支持字符串形式的 JSON）
-                models_config = provider_data.get("models", [])
-                if isinstance(models_config, str):
-                    try:
-                        import json
-
-                        models_config = json.loads(models_config)
-                    except Exception:
-                        models_config = []
-                elif not isinstance(models_config, list):
-                    models_config = []
-
-                for model_info in models_config:
-                    old_provider = {
-                        "name": provider_data["name"],
-                        "enabled": True,
-                        "priority": provider_data.get("priority", 0),
-                        "base_url": provider_data["base_url"],
-                        "api_key": provider_data["api_key"],
-                        "api_type": provider_data["api_type"],
-                        "keys": [provider_data["api_key"]],
-                        "api_url": provider_data["base_url"],
-                        "model": model_info.get("model_name", ""),
-                        "stream": False,
-                        "tls_verify": provider_data.get("tls_verify", True),
-                        "impersonate": provider_data.get("impersonate", "chrome131"),
-                    }
-
-                    internal_provider = ProviderConfig(**old_provider)
-
-                    model_config = ModelConfig(
-                        name=model_info.get("model_name", ""),
-                        triggers=model_info.get("triggers", []),
-                        providers=[internal_provider],
-                        enabled=True,
-                    )
-                    self.models.append(model_config)
 
     def init_prompts(self):
         """初始化提示词配置"""
@@ -1100,7 +1028,7 @@ class BigBanana(Star):
                     if trigger not in self.prompt_dict:
                         self.prompt_dict[trigger] = {
                             "prompt": "{{user_text}}",
-                            "__model_name__": model.name,
+                            "__model_name__": model.name
                         }
                     else:
                         # 如果已存在，标记该提示词属于哪个模型（如果未指定）
@@ -1165,12 +1093,7 @@ class BigBanana(Star):
                     else:
                         if key == "aspect_ratio":
                             value = value.strip("`'\" \t\r\n,，;；。.!！?？)）]】}、")
-                            value = (
-                                value.replace("：", ":")
-                                .replace("／", ":")
-                                .replace("/", ":")
-                                .replace("\\", ":")
-                            )
+                            value = value.replace("：", ":").replace("／", ":").replace("/", ":").replace("\\", ":")
                         params[key] = value
                     continue
             filtered.append(token)
@@ -1215,9 +1138,7 @@ class BigBanana(Star):
             return
 
         self.user_selected_provider_model[event.get_sender_id()] = chosen
-        self.conf["user_selected_provider_model"] = dict(
-            self.user_selected_provider_model
-        )
+        self.conf["user_selected_provider_model"] = dict(self.user_selected_provider_model)
         self.conf.save_config()
         yield event.plain_result(f"✅ 已切换模型：{key}（{chosen}）")
 
@@ -1317,27 +1238,22 @@ class BigBanana(Star):
         msg = ["📋 当前模型配置："]
         if not self.models:
             msg.append("暂无模型配置。")
-
+        
         for i, model in enumerate(self.models):
-            msg.append(
-                f"{i + 1}. {model.name} [{'✅启用' if model.enabled else '❌禁用'}]"
-            )
+            msg.append(f"{i+1}. {model.name} [{'✅启用' if model.enabled else '❌禁用'}]")
             msg.append(f"   触发词: {', '.join(model.triggers)}")
             if not model.providers:
                 msg.append("   提供商: 无")
             else:
                 msg.append(f"   提供商 ({len(model.providers)}):")
                 for j, provider in enumerate(model.providers):
-                    msg.append(
-                        f"     {j + 1}. [{provider.api_type}] {provider.name} {'(✅)' if provider.enabled else '(❌)'}"
-                    )
-
+                    msg.append(f"     {j+1}. [{provider.api_type}] {provider.name} {'(✅)' if provider.enabled else '(❌)'}")
+        
         yield event.plain_result("\n".join(msg))
 
+
     @filter.command("lm触发词添加", alias={"lmtka"})
-    async def add_model_trigger_command(
-        self, event: AstrMessageEvent, model_name: str = "", trigger: str = ""
-    ):
+    async def add_model_trigger_command(self, event: AstrMessageEvent, model_name: str = "", trigger: str = ""):
         """lm触发词添加 <模型名称> <触发词>"""
         if not self.is_global_admin(event):
             return
@@ -1355,39 +1271,37 @@ class BigBanana(Star):
             if m.get("name") == model_name:
                 target_model = m
                 break
-
+        
         if not target_model:
             yield event.plain_result(f"❌ 未找到模型：{model_name}")
             return
-
+        
         current_triggers = target_model.get("triggers", [])
         if trigger in current_triggers:
             yield event.plain_result(f"⚠️ 触发词 {trigger} 已存在于模型 {model_name}。")
             return
-
+            
         current_triggers.append(trigger)
         target_model["triggers"] = current_triggers
 
         self.conf["models"] = models_data
-
+        
         self.conf.save_config()
         self.init_providers()
         self.init_prompts()
-
+        
         yield event.plain_result(f"✅ 已为模型 {model_name} 添加触发词：{trigger}")
 
+
+
     @filter.command("lm提供商添加", alias={"lmpa"})
-    async def add_provider_command(
-        self, event: AstrMessageEvent, model_name: str = "", api_type: str = ""
-    ):
+    async def add_provider_command(self, event: AstrMessageEvent, model_name: str = "", api_type: str = ""):
         """lm提供商添加 <模型名称> <类型: Gemini/OpenAI_Chat>"""
         if not self.is_global_admin(event):
             return
 
         if not model_name or not api_type:
-            yield event.plain_result(
-                "❌ 用法：lm提供商添加 <模型名称> <类型>\n支持类型: Gemini, OpenAI_Chat, OpenAI_Images, Vertex_AI_Anonymous"
-            )
+            yield event.plain_result("❌ 用法：lm提供商添加 <模型名称> <类型>\n支持类型: Gemini, OpenAI_Chat, OpenAI_Images, Vertex_AI_Anonymous")
             return
 
         # Validate Model
@@ -1397,7 +1311,7 @@ class BigBanana(Star):
             if m.get("name") == model_name:
                 target_model_data = m
                 break
-
+        
         if not target_model_data:
             yield event.plain_result(f"❌ 未找到模型：{model_name}")
             return
@@ -1406,16 +1320,12 @@ class BigBanana(Star):
         # Note: Should match _API_Type literal
         valid_types = ["Gemini", "OpenAI_Chat", "OpenAI_Images", "Vertex_AI_Anonymous"]
         # Case insensitive match
-        api_type_match = next(
-            (t for t in valid_types if t.lower() == api_type.lower()), None
-        )
-
+        api_type_match = next((t for t in valid_types if t.lower() == api_type.lower()), None)
+        
         if not api_type_match:
-            yield event.plain_result(
-                f"❌ 不支持的类型：{api_type}。\n可选：{', '.join(valid_types)}"
-            )
-            return
-
+             yield event.plain_result(f"❌ 不支持的类型：{api_type}。\n可选：{', '.join(valid_types)}")
+             return
+        
         api_type = api_type_match
 
         # Prepare default config
@@ -1427,33 +1337,29 @@ class BigBanana(Star):
             "keys": [],
             "api_url": "",
             "model": "gemini-2.0-flash-exp" if "Gemini" in api_type else "gpt-4o",
-            "stream": False,
+            "stream": False
         }
-
+        
         # If Vertex_AI_Anonymous, no key needed
         if api_type == "Vertex_AI_Anonymous":
-            if "providers" not in target_model_data:
+             if "providers" not in target_model_data:
                 target_model_data["providers"] = []
-            target_model_data["providers"].append(provider_config)
-            self.conf.save_config()
-            self.init_providers()
-            yield event.plain_result(
-                f"✅ 已添加提供商 {provider_name} 到模型 {model_name}。"
-            )
-            return
+             target_model_data["providers"].append(provider_config)
+             self.conf.save_config()
+             self.init_providers()
+             yield event.plain_result(f"✅ 已添加提供商 {provider_name} 到模型 {model_name}。")
+             return
 
         # Interactive Setup
-        yield event.plain_result(
-            f"🍌 正在为模型 {model_name} 添加 {api_type} 提供商。\n请在60秒内输入 API Key (如果不需要请输入 'none' 或 'skip')："
-        )
-
+        yield event.plain_result(f"🍌 正在为模型 {model_name} 添加 {api_type} 提供商。\n请在60秒内输入 API Key (如果不需要请输入 'none' 或 'skip')：")
+        
         operator_id = event.get_sender_id()
-
+        
         @session_waiter(timeout=60, record_history_chains=False)
         async def waiter(controller: SessionController, ctx: AstrMessageEvent):
             if ctx.get_sender_id() != operator_id:
                 return
-
+            
             content = ctx.message_str.strip()
             if content == "取消":
                 await ctx.send(ctx.plain_result("已取消。"))
@@ -1462,31 +1368,25 @@ class BigBanana(Star):
 
             if content.lower() not in ["none", "skip", "跳过"]:
                 provider_config["keys"] = [content]
-
+            
             # Add to config
             if "providers" not in target_model_data:
                 target_model_data["providers"] = []
             target_model_data["providers"].append(provider_config)
-
+            
             self.conf.save_config()
             self.init_providers()
-
-            await ctx.send(
-                ctx.plain_result(
-                    f"✅ 已添加提供商 {provider_name} 到模型 {model_name}。\n更多参数（如API地址）请通过配置文件或WebUI修改。"
-                )
-            )
+            
+            await ctx.send(ctx.plain_result(f"✅ 已添加提供商 {provider_name} 到模型 {model_name}。\n更多参数（如API地址）请通过配置文件或WebUI修改。"))
             controller.stop()
 
         try:
             await waiter(event)
         except TimeoutError:
-            yield event.plain_result("❌ 超时，操作已取消。")
+             yield event.plain_result("❌ 超时，操作已取消。")
 
     @filter.command("lm提供商删除", alias={"lmpd"})
-    async def del_provider_command(
-        self, event: AstrMessageEvent, model_name: str = "", provider_index: str = ""
-    ):
+    async def del_provider_command(self, event: AstrMessageEvent, model_name: str = "", provider_index: str = ""):
         """lm提供商删除 <模型名称> <序号>"""
         if not self.is_global_admin(event):
             return
@@ -1494,36 +1394,32 @@ class BigBanana(Star):
         if not model_name or not provider_index or not provider_index.isdigit():
             yield event.plain_result("❌ 用法：lm提供商删除 <模型名称> <序号(从1开始)>")
             return
-
+        
         idx = int(provider_index) - 1
-
+        
         models_data = self.conf.get("models", [])
         target_model_data = None
         for m in models_data:
             if m.get("name") == model_name:
                 target_model_data = m
                 break
-
+        
         if not target_model_data:
             yield event.plain_result(f"❌ 未找到模型：{model_name}")
             return
-
+            
         providers = target_model_data.get("providers", [])
         if idx < 0 or idx >= len(providers):
-            yield event.plain_result(
-                f"❌ 序号 {provider_index} 无效。当前有 {len(providers)} 个提供商。"
-            )
-            return
-
+             yield event.plain_result(f"❌ 序号 {provider_index} 无效。当前有 {len(providers)} 个提供商。")
+             return
+             
         removed = providers.pop(idx)
         target_model_data["providers"] = providers
-
+        
         self.conf.save_config()
         self.init_providers()
-
-        yield event.plain_result(
-            f"🗑️ 已从模型 {model_name} 删除提供商：{removed.get('name')}"
-        )
+        
+        yield event.plain_result(f"🗑️ 已从模型 {model_name} 删除提供商：{removed.get('name')}")
 
     # === 管理指令：添加/更新提示词 ===
     @filter.command("lm添加", alias={"lma"})
@@ -1683,7 +1579,9 @@ class BigBanana(Star):
                 self.conf.save_config()
                 self.init_prompts()
                 await event.send(
-                    event.plain_result(f"✅ 已成功{action}提示词：「{trigger_word}」")
+                    event.plain_result(
+                        f"✅ 已成功{action}提示词：「{trigger_word}」"
+                    )
                 )
                 controller.stop()
 
@@ -1988,12 +1886,8 @@ class BigBanana(Star):
             params.update({k: v for k, v in user_params.items() if k != "prompt"})
 
         if not user_overrode_model:
-            selected_model = self.user_selected_provider_model.get(
-                event.get_sender_id()
-            )
-            if selected_model and (
-                preset_name is not None or "__model_name__" not in params
-            ):
+            selected_model = self.user_selected_provider_model.get(event.get_sender_id())
+            if selected_model and (preset_name is not None or "__model_name__" not in params):
                 params.setdefault("model", selected_model)
 
         # 处理预设提示词补充参数preset_append
@@ -2020,36 +1914,23 @@ class BigBanana(Star):
         }
         if cmd in {"bnn", "bnt", "bna"}:
             params["__model_name__"] = "nano-banana"
-
+            
             # 强制设置 image_size 为 2K（如果未指定且是 bnn 命令）
-            user_overrode_image_size = (
-                "image_size" in params and params["image_size"] is not None
-            )
+            user_overrode_image_size = "image_size" in params and params["image_size"] is not None
             if cmd == "bnn" and not user_overrode_image_size:
                 params["image_size"] = "2K"
-
+            
             # 模型选择逻辑：如果没有覆盖，优先使用配置，其次强制使用 nano-banana-pro
-            if (
-                not user_overrode_model
-                and not str(params.get("model", "") or "").strip()
-            ):
+            if not user_overrode_model and not str(params.get("model", "") or "").strip():
                 nanobanana_conf = self.conf.get("nanobanana_config", {})
                 primary_conf = (
-                    nanobanana_conf.get("primary", {})
-                    if isinstance(nanobanana_conf, dict)
-                    else {}
+                    nanobanana_conf.get("primary", {}) if isinstance(nanobanana_conf, dict) else {}
                 )
                 default_model = (
-                    primary_conf.get("model", None)
-                    if isinstance(primary_conf, dict)
-                    else None
+                    primary_conf.get("model", None) if isinstance(primary_conf, dict) else None
                 )
                 # 无论配置如何，如果没有配置，默认都是 nano-banana-pro
-                params["model"] = (
-                    str(default_model).strip()
-                    if str(default_model or "").strip()
-                    else "nano-banana-pro"
-                )
+                params["model"] = str(default_model).strip() if str(default_model or "").strip() else "nano-banana-pro"
         if is_nanobanana:
             if (
                 self.nanobanana_group_whitelist_enabled
@@ -2069,9 +1950,7 @@ class BigBanana(Star):
                 return
 
         if cmd == "反推":
-            min_required_images = params.get(
-                "min_images", self.prompt_config.min_images
-            )
+            min_required_images = params.get("min_images", self.prompt_config.min_images)
             try:
                 min_required_images = int(min_required_images)
             except Exception:
@@ -2178,9 +2057,7 @@ class BigBanana(Star):
         try:
             results, err_msg = await task
             if not results or err_msg:
-                if isinstance(err_msg, str) and err_msg.strip().startswith(
-                    "图片生成失败"
-                ):
+                if isinstance(err_msg, str) and err_msg.strip().startswith("图片生成失败"):
                     err_text = err_msg.strip()
                 else:
                     err_text = f"图片生成失败：{err_msg}"
@@ -2224,9 +2101,7 @@ class BigBanana(Star):
         reply_sender_id = ""
         for comp in event.get_messages():
             if isinstance(comp, Comp.Reply):
-                reply_urls, reply_sender_id = await self._collect_reply_image_urls(
-                    event, comp
-                )
+                reply_urls, reply_sender_id = await self._collect_reply_image_urls(event, comp)
                 if reply_urls:
                     image_urls.extend(reply_urls)
             # 处理At对象的QQ头像（对于艾特机器人的问题，还没有特别好的解决方案）
@@ -2507,12 +2382,12 @@ class BigBanana(Star):
                 if isinstance(gen_err, str) and gen_err.strip():
                     last_err = gen_err
             return None, last_err
-
+        
         # 1. 确定使用的模型
         model_name = params.get("__model_name__")
         target_model = None
         requested_provider_model = (params.get("model") or "").strip()
-
+        
         if (
             not model_name
             and not target_model
@@ -2567,7 +2442,7 @@ class BigBanana(Star):
                             providers=providers,
                             enabled=bool(model_data.get("enabled", True)),
                         )
-
+        
         # 如果未找到指定模型（或未指定），使用第一个启用的模型作为默认
         if not target_model and self.models:
             if requested_provider_model:
@@ -2589,17 +2464,17 @@ class BigBanana(Star):
                         break
             if not target_model:
                 target_model = self.models[0]
-
+            
         if not target_model:
             return None, "未配置任何模型。"
 
         # 2. 获取该模型的提供商列表
         all_candidate_providers = target_model.providers
         candidate_providers = all_candidate_providers
-
+        
         # 3. 筛选提供商 (如果 params 指定了 provider)
         target_provider_name = params.get("provider")
-
+        
         filtered_by_model_applied = False
         if requested_provider_model and not target_provider_name:
             filtered_by_model = [
@@ -2614,18 +2489,17 @@ class BigBanana(Star):
         if target_provider_name:
             # 尝试匹配 name
             filtered = [
-                p for p in candidate_providers if p.name == target_provider_name
+                p for p in candidate_providers 
+                if p.name == target_provider_name
             ]
-
+            
             if filtered:
                 candidate_providers = filtered
             else:
-                logger.warning(
-                    f"在模型 {target_model.name} 中未找到指定提供商: {target_provider_name}，将使用默认顺序"
-                )
+                logger.warning(f"在模型 {target_model.name} 中未找到指定提供商: {target_provider_name}，将使用默认顺序")
 
         if not candidate_providers:
-            return None, f"模型 {target_model.name} 未配置有效的提供商。"
+             return None, f"模型 {target_model.name} 未配置有效的提供商。"
 
         # 调度提供商
         for i, provider in enumerate(candidate_providers):
@@ -2645,18 +2519,16 @@ class BigBanana(Star):
                     downloader=self.downloader,
                     aiohttp_session=self.http_manager._get_aiohttp_session(),
                 )
-
+                
             call_params = params
             provider_model = str(provider.model or "").strip()
             params_model = str(params.get("model", "") or "").strip()
+            
+            logger.info(f"[BIG BANANA] Dispatch check: type={provider.api_type}, url={provider.api_url}, params_model={params_model}, provider_model={provider_model}")
 
-            logger.info(
-                f"[BIG BANANA] Dispatch check: type={provider.api_type}, url={provider.api_url}, params_model={params_model}, provider_model={provider_model}"
-            )
-
-            if provider.api_type == "OpenAI_Chat" and (
-                "grsai" in (provider.api_url or "").lower()
-                or "dakka.com.cn" in (provider.api_url or "").lower()
+            if (
+                provider.api_type == "OpenAI_Chat"
+                and ("grsai" in (provider.api_url or "").lower() or "dakka.com.cn" in (provider.api_url or "").lower())
             ):
                 # 检查是否为 nano-banana-pro 模型，如果是且未指定 image_size，则强制设置为 2K
                 # 这里的逻辑涵盖了 bnn 命令之外的调用（如预设提示词）
@@ -2666,13 +2538,9 @@ class BigBanana(Star):
                         # 确保不影响原 params 对象，虽然 call_params 此时是指向 params 的引用
                         # 如果需要隔离，应该 copy。但这里我们希望这个默认值生效。
                         call_params["image_size"] = "2K"
-                        logger.info(
-                            f"[BIG BANANA] 为 nano-banana-pro 强制设置默认分辨率: 2K"
-                        )
+                        logger.info(f"[BIG BANANA] 为 nano-banana-pro 强制设置默认分辨率: 2K")
 
-            images_result, err = await self.provider_map[
-                provider.api_type
-            ].generate_images(
+            images_result, err = await self.provider_map[provider.api_type].generate_images(
                 provider_config=provider,
                 params=call_params,
                 image_b64_list=image_b64_list,
@@ -2687,13 +2555,9 @@ class BigBanana(Star):
                     or "响应中未包含媒体数据" in err
                 )
             ):
-                fallback_images, fallback_err = await _try_grsai_images_fallback(
-                    provider, err
-                )
+                fallback_images, fallback_err = await _try_grsai_images_fallback(provider, err)
                 if fallback_images:
-                    logger.info(
-                        f"模型 {target_model.name} - {provider.name} 图片生成成功"
-                    )
+                    logger.info(f"模型 {target_model.name} - {provider.name} 图片生成成功")
                     return fallback_images, None
                 if isinstance(fallback_err, str) and fallback_err.strip():
                     err = fallback_err
@@ -2714,7 +2578,7 @@ class BigBanana(Star):
                         pass
                     else:
                         params["__best_err__"] = err
-
+            
             # 如果不是最后一个提供商，且配置了重试逻辑（隐含在列表顺序中），则继续
             if i < len(candidate_providers) - 1:
                 logger.warning(
@@ -2727,9 +2591,7 @@ class BigBanana(Star):
             and filtered_by_model_applied
             and not params.get("__user_overrode_model__", False)
         ):
-            remaining = [
-                p for p in all_candidate_providers if p not in candidate_providers
-            ]
+            remaining = [p for p in all_candidate_providers if p not in candidate_providers]
             if remaining:
                 fallback_params = params.copy()
                 fallback_params.pop("model", None)
@@ -2745,19 +2607,13 @@ class BigBanana(Star):
                         image_b64_list=image_b64_list,
                     )
                     if images_result:
-                        logger.info(
-                            f"模型 {target_model.name} - {provider.name} 图片生成成功"
-                        )
+                        logger.info(f"模型 {target_model.name} - {provider.name} 图片生成成功")
                         return images_result, None
 
         if allow_fallback:
-            fallback_probe_model = (
-                params.get("model") or candidate_providers[0].model or ""
-            ).strip()
+            fallback_probe_model = (params.get("model") or candidate_providers[0].model or "").strip()
             is_video_model = fallback_probe_model.startswith("veo_")
-            is_flow2api = any(
-                (p.name or "").strip() == "flow2api" for p in candidate_providers
-            )
+            is_flow2api = any((p.name or "").strip() == "flow2api" for p in candidate_providers)
             html_like_error = isinstance(err, str) and (
                 "HTML" in err
                 or "响应内容格式错误" in err
@@ -2769,11 +2625,7 @@ class BigBanana(Star):
             )
             if is_flow2api and not is_video_model and html_like_error:
                 fallback_model = next(
-                    (
-                        m
-                        for m in self.models
-                        if m.enabled and m.name in {"nano-banana", "Z-Image-Turbo"}
-                    ),
+                    (m for m in self.models if m.enabled and m.name in {"nano-banana", "Z-Image-Turbo"}),
                     None,
                 )
                 if not fallback_model:
@@ -2783,10 +2635,7 @@ class BigBanana(Star):
                             for m in self.models
                             if m.enabled
                             and m.name != target_model.name
-                            and any(
-                                (p.name or "").strip() != "flow2api"
-                                for p in m.providers
-                            )
+                            and any((p.name or "").strip() != "flow2api" for p in m.providers)
                         ),
                         None,
                     )
