@@ -52,3 +52,6 @@ temp_images/
 # AstrBot 特定
 *.db
 session.db
+
+# Windows 设备文件
+nul
