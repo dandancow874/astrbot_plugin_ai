@@ -967,6 +967,10 @@ class BigBanana(Star):
                         for k, v in provider_data.items()
                         if k in ProviderConfig.__annotations__
                     }
+                    # 添加必需字段的默认值
+                    payload.setdefault("priority", 0)
+                    payload.setdefault("base_url", "")
+                    payload.setdefault("api_key", "")
                     payload.setdefault("keys", [])
                     payload["api_url"] = self._normalize_api_url(
                         payload.get("api_type", ""), payload.get("api_url", "")
