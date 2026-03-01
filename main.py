@@ -938,19 +938,31 @@ class BigBanana(Star):
             providers = []
             for provider_data in providers_data:
                 if provider_data.get("enabled", False):
-                    # 过滤掉不在 ProviderConfig 中的字段
+                    # 获取关键字段（用于 setdefault）
+                    base_url = provider_data.get("api_url", "")
+                    api_key = provider_data.get("api_key", "")
+                    
+                    # 直接构建 payload，不使用过滤
                     payload = {
-                        k: v
-                        for k, v in provider_data.items()
-                        if k in ProviderConfig.__annotations__
+                        "name": provider_data.get("name", "Unknown"),
+                        "enabled": provider_data.get("enabled", True),
+                        "priority": provider_data.get("priority", 0),
+                        "base_url": base_url,
+                        "api_key": api_key,
+                        "api_type": provider_data.get("api_type", "OpenAI_Chat"),
+                        "tls_verify": provider_data.get("tls_verify", True),
+                        "impersonate": provider_data.get("impersonate", "chrome131"),
+                        # 兼容字段
+                        "keys": [api_key] if api_key else [],
+                        "api_url": self._normalize_api_url(
+                            provider_data.get("api_type", ""), base_url
+                        ),
+                        "model": provider_data.get("model", ""),
+                        "stream": provider_data.get("stream", False),
                     }
-                    payload.setdefault("keys", [])
-                    payload["api_url"] = self._normalize_api_url(
-                        payload.get("api_type", ""), payload.get("api_url", "")
-                    )
                     p_config = ProviderConfig(**payload)
                     providers.append(p_config)
-            
+                
             # Create ModelConfig
             model_config = ModelConfig(
                 name=model_data.get("name", "Unknown"),
