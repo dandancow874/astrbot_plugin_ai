@@ -496,51 +496,6 @@ class BigBanana(Star):
             logger.warning("models 配置格式错误，应为列表")
             models_data = []
         
-        # 兼容旧配置：如果 models 为空或配置不正确，尝试从 providers[].models 迁移
-        if not models_data:
-            providers_raw = self.conf.get("providers", [])
-            if isinstance(providers_raw, list):
-                migrated_count = 0
-                for prov in providers_raw:
-                    if not isinstance(prov, dict):
-                        continue
-                    prov_models = prov.get("models", [])
-                    if not isinstance(prov_models, list):
-                        continue
-                    for mi in prov_models:
-                        if not isinstance(mi, dict):
-                            continue
-                        model_name = mi.get("model_name", "")
-                        triggers = mi.get("triggers", [])
-                        if not model_name:
-                            continue
-                        models_data.append({
-                            "name": model_name,
-                            "triggers": triggers if triggers else [model_name.lower()],
-                            "providers": [{
-                                "name": prov.get("name", "Unknown"),
-                                "enabled": prov.get("enabled", True),
-                                "priority": prov.get("priority", 0),
-                                "api_url": prov.get("base_url", ""),
-                                "api_key": prov.get("api_key", ""),
-                                "api_type": prov.get("api_type", "OpenAI_Chat"),
-                                "tls_verify": prov.get("tls_verify", True),
-                                "impersonate": prov.get("impersonate", "chrome131"),
-                                "model": model_name,
-                                "stream": False,
-                            }],
-                            "enabled": True,
-                        })
-                        migrated_count += 1
-                
-                if migrated_count > 0:
-                    logger.info(f"自动迁移旧配置：{migrated_count} 个模型")
-                    self.conf["models"] = models_data
-                    # 清空旧的 providers[].models 避免重复迁移
-                    for prov in self.conf.get("providers", []):
-                        if isinstance(prov, dict) and "models" in prov:
-                            prov["models"] = []
-                    self.conf.save_config()
         # 确保 models_data 是列表
         if not isinstance(models_data, list):
             logger.warning("models 配置格式错误，应为列表")

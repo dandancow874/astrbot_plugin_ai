@@ -1,461 +1,415 @@
 {
-    "prompt": {
-        "description": "预设提示词",
+  "prompt": {
+    "description": "预设提示词",
+    "type": "list",
+    "default": [
+      "反推 详细描述这张图片 --min_images 1"
+    ],
+    "hint": "只保留反推命令。"
+  },
+  "models": {
+    "description": "模型配置列表（推荐结构）",
+    "type": "list",
+    "hint": "每个模型可配置多个提供商，按优先级调度",
+    "items": {
+      "name": {
+        "description": "模型名称",
+        "type": "string",
+        "default": "新模型"
+      },
+      "enabled": {
+        "description": "启用",
+        "type": "bool",
+        "default": true
+      },
+      "triggers": {
+        "description": "触发词列表",
         "type": "list",
-        "default": [
-            "反推 详细描述这张图片 --min_images 1"
-        ],
-        "hint": "只保留反推命令。"
-    },
-    "models": {
-        "description": "模型配置列表（推荐结构）",
+        "default": []
+      },
+      "providers": {
+        "description": "提供商列表",
         "type": "list",
-        "hint": "每个模型可配置多个提供商，按优先级调度",
         "items": {
-            "name": {
-                "description": "模型名称",
-                "type": "string",
-                "default": "新模型"
-            },
-            "enabled": {
-                "description": "启用",
-                "type": "bool",
-                "default": true
-            },
-            "triggers": {
-                "description": "触发词列表",
-                "type": "list",
-                "default": []
-            },
-            "providers": {
-                "description": "提供商列表",
-                "type": "list",
-                "items": {
-                    "name": {
-                        "description": "服务商名称",
-                        "type": "string",
-                        "default": "新服务商"
-                    },
-                    "enabled": {
-                        "description": "启用",
-                        "type": "bool",
-                        "default": true
-                    },
-                    "priority": {
-                        "description": "优先级（越小越优先）",
-                        "type": "int",
-                        "default": 0
-                    },
-                    "api_url": {
-                        "description": "API URL",
-                        "type": "string",
-                        "default": ""
-                    },
-                    "api_key": {
-                        "description": "API Key",
-                        "type": "string",
-                        "default": ""
-                    },
-                    "api_type": {
-                        "description": "API 类型",
-                        "type": "string",
-                        "options": [
-                            "OpenAI_Chat",
-                            "OpenAI_Images",
-                            "Gemini",
-                            "Vertex_AI_Anonymous"
-                        ],
-                        "default": "OpenAI_Chat"
-                    },
-                    "tls_verify": {
-                        "description": "TLS 证书验证",
-                        "type": "bool",
-                        "default": true
-                    },
-                    "impersonate": {
-                        "description": "TLS/UA 指纹伪装",
-                        "type": "string",
-                        "default": "chrome131"
-                    },
-                    "model": {
-                        "description": "模型名称（服务商端）",
-                        "type": "string",
-                        "default": ""
-                    },
-                    "stream": {
-                        "description": "流式响应",
-                        "type": "bool",
-                        "default": false
-                    }
-                },
-                "default": []
-            }
-        },
-        "default": [
-            {
-                "name": "nano-banana-pro",
-                "enabled": true,
-                "triggers": ["nbp"],
-                "providers": [
-                    {
-                        "name": "grsai",
-                        "enabled": true,
-                        "priority": 0,
-                        "api_url": "https://grsai.ai",
-                        "api_key": "sk-da2e418bb5474bff952c9f4579c5b4e0",
-                        "api_type": "OpenAI_Chat",
-                        "model": "nano-banana-pro",
-                        "tls_verify": true,
-                        "impersonate": "chrome131",
-                        "stream": false
-                    }
-                ]
-            },
-            {
-                "name": "nano-banana-2",
-                "enabled": true,
-                "triggers": ["nb2"],
-                "providers": [
-                    {
-                        "name": "grsai",
-                        "enabled": true,
-                        "priority": 0,
-                        "api_url": "https://grsai.ai",
-                        "api_key": "sk-da2e418bb5474bff952c9f4579c5b4e0",
-                        "api_type": "OpenAI_Chat",
-                        "model": "nano-banana-2",
-                        "tls_verify": true,
-                        "impersonate": "chrome131",
-                        "stream": false
-                    }
-                ]
-            },
-            {
-                "name": "z-image-turbo",
-                "enabled": true,
-                "triggers": ["zimg"],
-                "providers": [
-                    {
-                        "name": "gite",
-                        "enabled": true,
-                        "priority": 1,
-                        "api_url": "https://ai.gitee.com/v1",
-                        "api_key": "P7VWNFGGTW4TFSLHZEERAPOVC8TTJZ3JMSPKOK1L",
-                        "api_type": "OpenAI_Images",
-                        "model": "z-image-turbo",
-                        "tls_verify": true,
-                        "impersonate": "chrome131",
-                        "stream": false
-                    }
-                ]
-            },
-            {
-                "name": "FLUX.2-klein-9B",
-                "enabled": true,
-                "triggers": ["kl"],
-                "providers": [
-                    {
-                        "name": "gite",
-                        "enabled": true,
-                        "priority": 1,
-                        "api_url": "https://ai.gitee.com/v1",
-                        "api_key": "P7VWNFGGTW4TFSLHZEERAPOVC8TTJZ3JMSPKOK1L",
-                        "api_type": "OpenAI_Images",
-                        "model": "FLUX.2-klein-9B",
-                        "tls_verify": true,
-                        "impersonate": "chrome131",
-                        "stream": false
-                    }
-                ]
-            }
-        ]
-    },
-    "providers": {
-        "description": "AI 服务商配置（已废弃，仅向后兼容）",
-        "type": "list",
-        "hint": "⚠️ 已废弃：请使用顶层 models 配置。此字段仅用于兼容旧配置，不会被主动读取。",
-        "items": {
-            "name": {
-                "description": "服务商名称",
-                "type": "string",
-                "default": "新服务商"
-            },
-            "enabled": {
-                "description": "启用",
-                "type": "bool",
-                "default": true
-            },
-            "priority": {
-                "description": "优先级",
-                "type": "int",
-                "default": 0
-            },
-            "base_url": {
-                "description": "Base URL",
-                "type": "string",
-                "default": "https://grsai.ai"
-            },
-            "api_key": {
-                "description": "API Key",
-                "type": "string",
-                "default": ""
-            },
-            "api_type": {
-                "description": "API 类型",
-                "type": "string",
-                "options": [
-                    "OpenAI_Chat",
-                    "OpenAI_Images",
-                    "Gemini",
-                    "Vertex_AI_Anonymous"
-                ],
-                "default": "OpenAI_Chat"
-            },
-            "tls_verify": {
-                "description": "TLS 证书验证",
-                "type": "bool",
-                "default": true
-            },
-            "impersonate": {
-                "description": "TLS/UA 指纹伪装",
-                "type": "string",
-                "default": "chrome131"
-            }
+          "name": {
+            "description": "服务商名称",
+            "type": "string",
+            "default": "新服务商"
+          },
+          "enabled": {
+            "description": "启用",
+            "type": "bool",
+            "default": true
+          },
+          "priority": {
+            "description": "优先级（越小越优先）",
+            "type": "int",
+            "default": 0
+          },
+          "api_url": {
+            "description": "API URL",
+            "type": "string",
+            "default": ""
+          },
+          "api_key": {
+            "description": "API Key",
+            "type": "string",
+            "default": ""
+          },
+          "api_type": {
+            "description": "API 类型",
+            "type": "string",
+            "options": [
+              "OpenAI_Chat",
+              "OpenAI_Images",
+              "Gemini",
+              "Vertex_AI_Anonymous"
+            ],
+            "default": "OpenAI_Chat"
+          },
+          "tls_verify": {
+            "description": "TLS 证书验证",
+            "type": "bool",
+            "default": true
+          },
+          "impersonate": {
+            "description": "TLS/UA 指纹伪装",
+            "type": "string",
+            "default": "chrome131"
+          },
+          "model": {
+            "description": "模型名称（服务商端）",
+            "type": "string",
+            "default": ""
+          },
+          "stream": {
+            "description": "流式响应",
+            "type": "bool",
+            "default": false
+          }
         },
         "default": []
+      }
     },
-    "Image-to-Prompt": {
-        "description": "Image-to-Prompt 模型配置",
+    "default": [
+      {
+        "name": "nano-banana-pro",
+        "enabled": true,
+        "triggers": [
+          "nbp"
+        ],
+        "providers": [
+          {
+            "name": "grsai",
+            "enabled": true,
+            "priority": 0,
+            "api_url": "https://grsai.ai",
+            "api_key": "sk-da2e418bb5474bff952c9f4579c5b4e0",
+            "api_type": "OpenAI_Chat",
+            "model": "nano-banana-pro",
+            "tls_verify": true,
+            "impersonate": "chrome131",
+            "stream": false
+          }
+        ]
+      },
+      {
+        "name": "nano-banana-2",
+        "enabled": true,
+        "triggers": [
+          "nb2"
+        ],
+        "providers": [
+          {
+            "name": "grsai",
+            "enabled": true,
+            "priority": 0,
+            "api_url": "https://grsai.ai",
+            "api_key": "sk-da2e418bb5474bff952c9f4579c5b4e0",
+            "api_type": "OpenAI_Chat",
+            "model": "nano-banana-2",
+            "tls_verify": true,
+            "impersonate": "chrome131",
+            "stream": false
+          }
+        ]
+      },
+      {
+        "name": "z-image-turbo",
+        "enabled": true,
+        "triggers": [
+          "zimg"
+        ],
+        "providers": [
+          {
+            "name": "gite",
+            "enabled": true,
+            "priority": 1,
+            "api_url": "https://ai.gitee.com/v1",
+            "api_key": "P7VWNFGGTW4TFSLHZEERAPOVC8TTJZ3JMSPKOK1L",
+            "api_type": "OpenAI_Images",
+            "model": "z-image-turbo",
+            "tls_verify": true,
+            "impersonate": "chrome131",
+            "stream": false
+          }
+        ]
+      },
+      {
+        "name": "FLUX.2-klein-9B",
+        "enabled": true,
+        "triggers": [
+          "kl"
+        ],
+        "providers": [
+          {
+            "name": "gite",
+            "enabled": true,
+            "priority": 1,
+            "api_url": "https://ai.gitee.com/v1",
+            "api_key": "P7VWNFGGTW4TFSLHZEERAPOVC8TTJZ3JMSPKOK1L",
+            "api_type": "OpenAI_Images",
+            "model": "FLUX.2-klein-9B",
+            "tls_verify": true,
+            "impersonate": "chrome131",
+            "stream": false
+          }
+        ]
+      }
+    ]
+  },
+  "Image-to-Prompt": {
+    "description": "Image-to-Prompt 模型配置",
+    "type": "object",
+    "hint": "反推会使用这里配置的 URL 与 API Key。",
+    "items": {
+      "enabled": {
+        "description": "启用",
+        "type": "bool",
+        "default": true
+      },
+      "model": {
+        "description": "模型名称",
+        "type": "string",
+        "default": ""
+      },
+      "system_prompt": {
+        "description": "系统提示词",
+        "type": "string",
+        "default": ""
+      },
+      "primary": {
+        "description": "主提供商",
         "type": "object",
-        "hint": "反推会使用这里配置的 URL 与 API Key。",
         "items": {
-            "enabled": {
-                "description": "启用",
-                "type": "bool",
-                "default": true
-            },
-            "model": {
-                "description": "模型名称",
-                "type": "string",
-                "default": ""
-            },
-            "system_prompt": {
-                "description": "系统提示词",
-                "type": "string",
-                "default": ""
-            },
-            "primary": {
-                "description": "主提供商",
-                "type": "object",
-                "items": {
-                    "api_url": {
-                        "description": "OpenAI 兼容 URL",
-                        "type": "string",
-                        "default": "https://api.openai.com/v1",
-                        "hint": "填 Base URL。"
-                    },
-                    "api_key": {
-                        "description": "API Key",
-                        "type": "string",
-                        "default": "",
-                        "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
-                    },
-                    "tls_verify": {
-                        "description": "TLS 证书验证",
-                        "type": "bool",
-                        "default": true
-                    },
-                    "impersonate": {
-                        "description": "TLS/UA 指纹伪装",
-                        "type": "string",
-                        "default": "chrome131"
-                    }
-                }
-            }
+          "api_url": {
+            "description": "OpenAI 兼容 URL",
+            "type": "string",
+            "default": "https://api.openai.com/v1",
+            "hint": "填 Base URL。"
+          },
+          "api_key": {
+            "description": "API Key",
+            "type": "string",
+            "default": "",
+            "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+          },
+          "tls_verify": {
+            "description": "TLS 证书验证",
+            "type": "bool",
+            "default": true
+          },
+          "impersonate": {
+            "description": "TLS/UA 指纹伪装",
+            "type": "string",
+            "default": "chrome131"
+          }
         }
-    },
-    "prompt_config": {
-        "description": "提示词默认参数",
-        "type": "object",
-        "hint": "",
-        "items": {
-            "min_images": {
-                "description": "最小输入图片数量",
-                "type": "int",
-                "default": 1
-            },
-            "max_images": {
-                "description": "最大输入图片数量",
-                "type": "int",
-                "default": 6
-            },
-            "aspect_ratio": {
-                "description": "宽高比",
-                "type": "string",
-                "options": [
-                    "default",
-                    "1:1",
-                    "2:3",
-                    "3:2",
-                    "3:4",
-                    "4:3",
-                    "9:16",
-                    "16:9"
-                ],
-                "default": "default"
-            },
-            "image_size": {
-                "description": "分辨率",
-                "type": "string",
-                "options": [
-                    "1K",
-                    "2K",
-                    "4K"
-                ],
-                "default": "1K"
-            },
-            "google_search": {
-                "description": "是否启用谷歌搜索工具",
-                "type": "bool",
-                "default": true
-            },
-            "refer_images": {
-                "description": "参考图片",
-                "type": "string",
-                "default": ""
-            },
-            "gather_mode": {
-                "description": "启用收集模式",
-                "type": "bool",
-                "default": false
-            }
-        }
-    },
-    "common_config": {
-        "description": "常规配置",
-        "type": "object",
-        "hint": "",
-        "items": {
-            "preset_append": {
-                "description": "启用预设提示词补充",
-                "type": "bool",
-                "default": true
-            },
-            "text_response": {
-                "description": "启用文本响应",
-                "type": "bool",
-                "default": false
-            },
-            "smart_retry": {
-                "description": "启用智能重试",
-                "type": "bool",
-                "default": true
-            },
-            "max_retry": {
-                "description": "最大重试次数",
-                "type": "int",
-                "default": 3
-            },
-            "timeout": {
-                "description": "超时",
-                "type": "float",
-                "default": 300
-            },
-            "proxy": {
-                "description": "HTTP 代理",
-                "type": "string",
-                "default": ""
-            }
-        }
-    },
-    "prefix_config": {
-        "description": "绘图命令触发方式",
-        "type": "object",
-        "hint": "",
-        "items": {
-            "coexist_enabled": {
-                "description": "混合模式",
-                "type": "bool",
-                "default": false
-            },
-            "prefix_list": {
-                "description": "命令前缀",
-                "type": "list",
-                "default": []
-            }
-        }
-    },
-    "preference_config": {
-        "description": "偏好设置",
-        "type": "object",
-        "hint": "以下配置因个人使用需求而异。跳过 At 头像的三个选项共用一个计数。",
-        "items": {
-            "skip_at_first": {
-                "description": "跳过第一次@机器人",
-                "type": "bool",
-                "default": true
-            },
-            "skip_quote_first": {
-                "description": "跳过第一次@引用",
-                "type": "bool",
-                "default": true
-            },
-            "skip_llm_at_first": {
-                "description": "LLM 跳过第一次@机器人",
-                "type": "bool",
-                "default": true
-            }
-        }
-    },
-    "llm_tool_settings": {
-        "description": "LLM 函数调用工具配置",
-        "type": "object",
-        "hint": "",
-        "items": {
-            "llm_tool_enabled": {
-                "description": "启用函数调用工具",
-                "type": "bool",
-                "default": true
-            }
-        }
-    },
-    "save_images": {
-        "description": "图片存储",
-        "type": "object",
-        "hint": "",
-        "items": {
-            "local_save": {
-                "description": "本地存储",
-                "type": "bool",
-                "default": false
-            }
-        }
-    },
-    "whitelist_config": {
-        "description": "白名单配置",
-        "type": "object",
-        "hint": "",
-        "items": {
-            "enabled": {
-                "description": "启用群组白名单",
-                "type": "bool",
-                "default": false
-            },
-            "whitelist": {
-                "description": "群组 UMO 白名单",
-                "type": "list",
-                "default": []
-            },
-            "user_enabled": {
-                "description": "启用用户白名单",
-                "type": "bool",
-                "default": false
-            },
-            "user_whitelist": {
-                "description": "用户 ID 白名单",
-                "type": "list",
-                "default": []
-            }
-        }
+      }
     }
+  },
+  "prompt_config": {
+    "description": "提示词默认参数",
+    "type": "object",
+    "hint": "",
+    "items": {
+      "min_images": {
+        "description": "最小输入图片数量",
+        "type": "int",
+        "default": 1
+      },
+      "max_images": {
+        "description": "最大输入图片数量",
+        "type": "int",
+        "default": 6
+      },
+      "aspect_ratio": {
+        "description": "宽高比",
+        "type": "string",
+        "options": [
+          "default",
+          "1:1",
+          "2:3",
+          "3:2",
+          "3:4",
+          "4:3",
+          "9:16",
+          "16:9"
+        ],
+        "default": "default"
+      },
+      "image_size": {
+        "description": "分辨率",
+        "type": "string",
+        "options": [
+          "1K",
+          "2K",
+          "4K"
+        ],
+        "default": "1K"
+      },
+      "google_search": {
+        "description": "是否启用谷歌搜索工具",
+        "type": "bool",
+        "default": true
+      },
+      "refer_images": {
+        "description": "参考图片",
+        "type": "string",
+        "default": ""
+      },
+      "gather_mode": {
+        "description": "启用收集模式",
+        "type": "bool",
+        "default": false
+      }
+    }
+  },
+  "common_config": {
+    "description": "常规配置",
+    "type": "object",
+    "hint": "",
+    "items": {
+      "preset_append": {
+        "description": "启用预设提示词补充",
+        "type": "bool",
+        "default": true
+      },
+      "text_response": {
+        "description": "启用文本响应",
+        "type": "bool",
+        "default": false
+      },
+      "smart_retry": {
+        "description": "启用智能重试",
+        "type": "bool",
+        "default": true
+      },
+      "max_retry": {
+        "description": "最大重试次数",
+        "type": "int",
+        "default": 3
+      },
+      "timeout": {
+        "description": "超时",
+        "type": "float",
+        "default": 300
+      },
+      "proxy": {
+        "description": "HTTP 代理",
+        "type": "string",
+        "default": ""
+      }
+    }
+  },
+  "prefix_config": {
+    "description": "绘图命令触发方式",
+    "type": "object",
+    "hint": "",
+    "items": {
+      "coexist_enabled": {
+        "description": "混合模式",
+        "type": "bool",
+        "default": false
+      },
+      "prefix_list": {
+        "description": "命令前缀",
+        "type": "list",
+        "default": []
+      }
+    }
+  },
+  "preference_config": {
+    "description": "偏好设置",
+    "type": "object",
+    "hint": "以下配置因个人使用需求而异。跳过 At 头像的三个选项共用一个计数。",
+    "items": {
+      "skip_at_first": {
+        "description": "跳过第一次@机器人",
+        "type": "bool",
+        "default": true
+      },
+      "skip_quote_first": {
+        "description": "跳过第一次@引用",
+        "type": "bool",
+        "default": true
+      },
+      "skip_llm_at_first": {
+        "description": "LLM 跳过第一次@机器人",
+        "type": "bool",
+        "default": true
+      }
+    }
+  },
+  "llm_tool_settings": {
+    "description": "LLM 函数调用工具配置",
+    "type": "object",
+    "hint": "",
+    "items": {
+      "llm_tool_enabled": {
+        "description": "启用函数调用工具",
+        "type": "bool",
+        "default": true
+      }
+    }
+  },
+  "save_images": {
+    "description": "图片存储",
+    "type": "object",
+    "hint": "",
+    "items": {
+      "local_save": {
+        "description": "本地存储",
+        "type": "bool",
+        "default": false
+      }
+    }
+  },
+  "whitelist_config": {
+    "description": "白名单配置",
+    "type": "object",
+    "hint": "",
+    "items": {
+      "enabled": {
+        "description": "启用群组白名单",
+        "type": "bool",
+        "default": false
+      },
+      "whitelist": {
+        "description": "群组 UMO 白名单",
+        "type": "list",
+        "default": []
+      },
+      "user_enabled": {
+        "description": "启用用户白名单",
+        "type": "bool",
+        "default": false
+      },
+      "user_whitelist": {
+        "description": "用户 ID 白名单",
+        "type": "list",
+        "default": []
+      }
+    }
+  }
 }
