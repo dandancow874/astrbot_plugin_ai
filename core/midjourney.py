@@ -464,12 +464,13 @@ class MidjourneyProvider(BaseProvider):
             if not isinstance(result, dict):
                 return None, 500, f"响应格式错误: {resp_text[:200]}"
 
-            # 获取任务 ID
+            # 获取任务 ID (T8star API 返回格式: {"code":1,"description":"Submit success","result":"task_id"})
             task_id = (
-                result.get("taskId")
+                result.get("result")  # T8star API 格式
+                or result.get("taskId")
                 or result.get("task_id")
                 or result.get("id")
-                or result.get("data", {}).get("taskId")
+                or (result.get("data", {}) or {}).get("taskId")
             )
 
             if not task_id or not isinstance(task_id, str):
