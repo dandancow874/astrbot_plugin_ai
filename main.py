@@ -2133,7 +2133,8 @@ class BigBanana(Star):
         image_urls = list(dict.fromkeys(image_urls))
         params["__source_image_urls__"] = image_urls
         # 判断图片数量是否满足最小要求
-        if len(image_urls) + len(image_b64_list) < min_required_images:
+        # 图生图模式必须满足图片要求，文生图模式跳过此检查
+        if is_i2i_mode and len(image_urls) + len(image_b64_list) < min_required_images:
             warn_msg = f"图片数量不足，最少需要 {min_required_images} 张图片，当前仅 {len(image_urls) + len(image_b64_list)} 张"
             logger.warning(warn_msg)
             return None, warn_msg
@@ -2151,7 +2152,8 @@ class BigBanana(Star):
                 image_b64_list.extend(fetched)
 
             # 如果 min_required_images 为 0，列表为空是允许的
-            if not image_b64_list and min_required_images > 0:
+            # 图生图模式才检查图片下载失败
+            if not image_b64_list and min_required_images > 0 and is_i2i_mode:
                 logger.error("全部参考图片下载失败")
                 return None, "全部参考图片下载失败"
 
