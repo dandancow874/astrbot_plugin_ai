@@ -9,8 +9,9 @@ AstrBot 图片生成插件，支持多种 AI 绘图模型。
   - **nano-banana-pro** (触发词: `bp1`, `bp2`, `bp3`)
   - **Z-Image-Turbo** (触发词: `zimg`)
   - **Qwen-Image-Edit** (触发词: `edit`) - 图片编辑
-  - **Midjourney V7** (触发词: `mj`)
-  - **Niji 7** (触发词: `nj`) - 动漫风格
+  - **Midjourney V7** (触发词: `mj`, `mj2`)
+  - **Niji 7** (触发词: `nj`, `nj2`) - 动漫风格
+  - **qwen-image-edit-2511** (触发词: `edit`)
   - **Image-to-Prompt** (触发词: `反推`) - 图片反推提示词
 
 - 支持自定义预设提示词

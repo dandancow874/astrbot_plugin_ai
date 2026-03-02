@@ -806,7 +806,7 @@ class BigBanana(Star):
         upsert_fixed_model(
             conf_key="midjourney_config",
             name="Midjourney-V7",
-            default_triggers=["mj"],
+            default_triggers=["mj","mj2"],
             default_provider_stub={
                 "name": "Midjourney账号",
                 "enabled": True,
@@ -821,7 +821,7 @@ class BigBanana(Star):
         upsert_fixed_model(
             conf_key="midjourney_config",
             name="Midjourney-Niji7",
-            default_triggers=["nj"],
+            default_triggers=["nj","nj2"],
             default_provider_stub={
                 "name": "Midjourney账号",
                 "enabled": True,
@@ -2084,7 +2084,7 @@ class BigBanana(Star):
                         )
 
         trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
-        is_i2i_mode = trigger_cmd in {"bp2", "edit","bt2"}
+        is_i2i_mode = trigger_cmd in {"bp2", "edit", "bt2", "mj2", "nj2"}
         if (
             is_i2i_mode
             and not image_urls
