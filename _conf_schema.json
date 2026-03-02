@@ -12,7 +12,7 @@
             "zimg {{user_text}} --min_images 0 --image_size 2K",
             "edit {{user_text}} --min_images 1",
             "mj1 {{user_text}} --min_images 0 ",
-            "nj2 {{user_text}} --min_images 0 ",
+            "nj1 {{user_text}} --min_images 0 ",
             "mj2 {{user_text}} --min_images 1 ",
             "nj2 {{user_text}} --min_images 1 ",
             "反推 详细描述这张图片 --min_images 1"

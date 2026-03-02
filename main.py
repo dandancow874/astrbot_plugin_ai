@@ -48,7 +48,7 @@ PARAMS_ALIAS_MAP = {
     "append_mode": "gather_mode",
     "ar": "aspect_ratio",
     "r": "aspect_ratio",
-    "p": "preset",
+    "ps": "preset",
 }
 
 # 支持的文件格式
@@ -2104,9 +2104,11 @@ class BigBanana(Star):
         min_required_images = params.get("min_images", self.prompt_config.min_images)
         max_allowed_images = params.get("max_images", self.prompt_config.max_images)
         # 如果图片数量不满足最小要求，且消息平台是Aiocqhttp，取消息发送者头像作为参考图片
+        # 只有图生图模式才添加头像
         if (
             len(image_urls) < min_required_images
-            and int(min_required_images or 0) == 1
+            and int(min_required_images or 0) >= 1
+            and is_i2i_mode
             and event.platform_meta.name == "aiocqhttp"
         ):
             image_urls.append(
