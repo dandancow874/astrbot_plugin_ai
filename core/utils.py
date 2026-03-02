@@ -11,9 +11,18 @@ def get_key_index(current_index: int, item_len: int) -> int:
     return (current_index + 1) % item_len
 
 
-def save_images(image_result, path_dir: Path) -> list[tuple[str, Path]]:
-    """保存图片到本地文件系统，返回 元组(文件名, 文件路径) 列表"""
-    # 假设它支持返回多张图片
+def save_images(image_result, path_dir: Path, save_json: bool = False, prompt: str = "", model_name: str = "") -> list[tuple[str, Path]]:
+    """保存图片到本地文件系统，返回 元组(文件名, 文件路径) 列表
+    
+    参数:
+        image_result: 图片列表 [(mime, b64), ...]
+        path_dir: 保存目录
+        save_json: 是否同时保存JSON元数据
+        prompt: 提示词 (用于JSON元数据)
+        model_name: 模型名称 (用于JSON元数据)
+    """
+    import json
+    
     saved_paths: list[tuple[str, Path]] = []
     for mime, b64 in image_result:
         if not b64:
@@ -34,6 +43,21 @@ def save_images(image_result, path_dir: Path) -> list[tuple[str, Path]]:
             f.write(image_bytes)
         saved_paths.append((file_name, save_path))
         logger.info(f"[BIG BANANA] 图片已保存到 {save_path}")
+        
+        # 保存JSON元数据
+        if save_json:
+            json_data = {
+                "tags": [model_name] if model_name else [],
+                "annotation": prompt or ""
+            }
+            json_path = path_dir / f"banana_{current_time_str}.json"
+            try:
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(json_data, f, ensure_ascii=False, indent=2)
+                logger.info(f"[BIG BANANA] JSON已保存到 {json_path}")
+            except Exception as e:
+                logger.error(f"[BIG BANANA] 保存JSON失败: {e}")
+    
     return saved_paths
 
 

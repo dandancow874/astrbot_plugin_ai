@@ -519,10 +519,7 @@
                 "hint": "命令前缀列表。触发格式是 命令前缀+触发词。"
             }
         }
-    }
-}
-}
-},
+    },
 "preference_config": {
 "description": "偏好设置",
 "type": "object",
@@ -561,53 +558,54 @@
 }
 }
 },
-"save_images": {
-"description": "图片存储",
-"type": "object",
-"hint": "",
-"items": {
-"local_save": {
-    "description": "本地存储",
-    "type": "bool",
-    "default": false,
-    "hint": "生成的图片保存到插件数据目录的 save_images 文件夹"
-},
-"save_json": {
-    "description": "同时保存JSON元数据",
-    "type": "bool",
-    "default": false,
-    "hint": "启用后，保存图片时会同时保存同名JSON文件，包含提示词和模型名称"
-}
-},
-"whitelist_config": {
-"description": "白名单配置",
-"type": "object",
-"hint": "",
-"items": {
-"enabled": {
-    "description": "启用群组白名单",
-    "type": "bool",
-    "default": false,
-    "hint": "开启后，只有在白名单内的群组可以使用"
-},
-"whitelist": {
-    "description": "群组UMO白名单",
-    "type": "list",
-    "default": [],
-    "hint": "白名单群组UMO列表，可在对应群内使用/sid获取。要把UMO写完整。"
-},
-"user_enabled": {
-    "description": "启用用户白名单",
-    "type": "bool",
-    "default": false,
-    "hint": "开启后，只有在白名单内的用户可以使用"
-},
-"user_whitelist": {
-    "description": "用户ID白名单",
-    "type": "list",
-    "default": [],
-    "hint": "用户QQ号列表"
-}
-}
-}
+    "save_images": {
+        "description": "图片存储",
+        "type": "object",
+        "hint": "",
+        "items": {
+            "local_save": {
+                "description": "本地存储",
+                "type": "bool",
+                "default": false,
+                "hint": "生成的图片保存到插件数据目录的 save_images 文件夹"
+            },
+            "save_json": {
+                "description": "同时保存JSON元数据",
+                "type": "bool",
+                "default": false,
+                "hint": "启用后，保存图片时会同时保存同名JSON文件，包含提示词和模型名称"
+            }
+        }
+    },
+    "whitelist_config": {
+        "description": "白名单配置",
+        "type": "object",
+        "hint": "",
+        "items": {
+            "enabled": {
+                "description": "启用群组白名单",
+                "type": "bool",
+                "default": false,
+                "hint": "开启后，只有在白名单内的群组可以使用"
+            },
+            "whitelist": {
+                "description": "群组UMO白名单",
+                "type": "list",
+                "default": [],
+                "hint": "白名单群组UMO列表，可在对应群内使用/sid获取。要把UMO写完整。"
+            },
+            "user_enabled": {
+                "description": "启用用户白名单",
+                "type": "bool",
+                "default": false,
+                "hint": "开启后，只有在白名单内的用户可以使用"
+            },
+            "user_whitelist": {
+                "description": "用户ID白名单",
+                "type": "list",
+                "default": [],
+                "hint": "用户QQ号列表"
+            }
+        }
+    }
 }

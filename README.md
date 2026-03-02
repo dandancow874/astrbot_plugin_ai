@@ -1,4 +1,6 @@
 # AstrBot Plugin AI
+[astrbot_plugin_big_banana](https://github.com/sukafon/astrbot_plugin_big_banana)
+拿这个插件改的,增加了几个生图模型
 
 AstrBot 图片生成插件，支持多种 AI 绘图模型。
 
@@ -13,6 +15,9 @@ AstrBot 图片生成插件，支持多种 AI 绘图模型。
   - **Niji 7** (触发词: `nj`, `nj2`) - 动漫风格
   - **qwen-image-edit-2511** (触发词: `edit`)
   - **Image-to-Prompt** (触发词: `反推`) - 图片反推提示词
+
+
+- 触发词带2的都是图生图
 
 - 支持自定义预设提示词
 - 支持 LLM 函数调用工具
@@ -42,7 +47,7 @@ Midjourney 返回的四宫格图片会自动裁切成 4 张独立图片发送。
 
 ### 垫图功能
 
-回复图片并使用绘图命令，图片会作为参考图传递给 AI 模型。
+使用图生图模式的预设词,回复图片并使用绘图命令，图片会作为参考图传递给 AI 模型,没有传图片会使用头像做为参考
 
 ### 预设提示词
 

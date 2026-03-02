@@ -432,14 +432,16 @@ class BigBanana(Star):
         self.prefix_list = prefix_config.get("prefix_list", [])
 
         # 数据目录
-        data_dir = StarTools.get_data_dir("astrbot_plugin_ai")
+        data_dir = StarTools.get_data_dir("astrbot_plugin_big_banana")
         self.refer_images_dir = data_dir / "refer_images"
         self.save_dir = data_dir / "save_images"
         # 临时文件目录
         self.temp_dir = data_dir / "temp_images"
 
         # 图片持久化
-        self.save_images = self.conf.get("save_images", {}).get("local_save", False)
+        save_images_config = self.conf.get("save_images", {})
+        self.save_images = save_images_config.get("local_save", False)
+        self.save_json = save_images_config.get("save_json", False)
 
         # 正在运行的任务映射
         self.running_tasks: dict[str, asyncio.Task] = {}
@@ -2170,7 +2172,10 @@ class BigBanana(Star):
 
         # 保存图片到本地
         if self.save_images:
-            save_images(valid_results, self.save_dir)
+            # 获取提示词和模型名称用于JSON元数据
+            prompt_text = params.get("prompt", params.get("user_text", ""))
+            model_name = params.get("__model_name__", "")
+            save_images(valid_results, self.save_dir, self.save_json, prompt_text, model_name)
 
         return valid_results, None
 
