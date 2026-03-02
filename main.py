@@ -432,7 +432,7 @@ class BigBanana(Star):
         self.prefix_list = prefix_config.get("prefix_list", [])
 
         # 数据目录
-        data_dir = StarTools.get_data_dir("astrbot_plugin_big_banana")
+        data_dir = StarTools.get_data_dir("astrbot_plugin_ai")
         self.refer_images_dir = data_dir / "refer_images"
         self.save_dir = data_dir / "save_images"
         # 临时文件目录
@@ -2054,7 +2054,11 @@ class BigBanana(Star):
                 ):
                     skipped_at_qq = True
                     continue
-                image_urls.append(f"https://q.qlogo.cn/g?b=qq&s=0&nk={comp.qq}")
+                # 只有图生图模式才添加At头像作为参考图
+                # is_i2i_mode 需要在循环之前计算
+                trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
+                if trigger_cmd in {"bp2", "edit", "bt2", "mj2", "nj2"}:
+                    image_urls.append(f"https://q.qlogo.cn/g?b=qq&s=0&nk={comp.qq}")
             elif isinstance(comp, Comp.Image) and comp.url:
                 image_urls.append(comp.url)
             elif (
