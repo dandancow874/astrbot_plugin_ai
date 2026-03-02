@@ -808,7 +808,7 @@ class BigBanana(Star):
         upsert_fixed_model(
             conf_key="midjourney_config",
             name="Midjourney-V7",
-            default_triggers=["mj","mj2"],
+            default_triggers=["mj1","mj2"],
             default_provider_stub={
                 "name": "Midjourney账号",
                 "enabled": True,
@@ -823,7 +823,7 @@ class BigBanana(Star):
         upsert_fixed_model(
             conf_key="midjourney_config",
             name="Midjourney-Niji7",
-            default_triggers=["nj","nj2"],
+            default_triggers=["nj1","nj2"],
             default_provider_stub={
                 "name": "Midjourney账号",
                 "enabled": True,

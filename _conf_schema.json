@@ -11,8 +11,8 @@
             "bt3 {{user_text}} --min_images 0 --gather_mode --image_size 2K",
             "zimg {{user_text}} --min_images 0 --image_size 2K",
             "edit {{user_text}} --min_images 1",
-            "mj {{user_text}} --min_images 0 ",
-            "nj {{user_text}} --min_images 0 ",
+            "mj1 {{user_text}} --min_images 0 ",
+            "nj2 {{user_text}} --min_images 0 ",
             "mj2 {{user_text}} --min_images 1 ",
             "nj2 {{user_text}} --min_images 1 ",
             "反推 详细描述这张图片 --min_images 1"
@@ -520,44 +520,44 @@
             }
         }
     },
-"preference_config": {
-"description": "偏好设置",
-"type": "object",
-"hint": "以下配置因个人使用需求而异，暂无两全之策。跳过At头像的三个选项共用一个计数。",
-"items": {
-"skip_at_first": {
-    "description": "跳过第一次@机器人",
-    "type": "bool",
-    "default": true,
-    "hint": "通过@唤醒机器人时，跳过一次机器人的头像。"
-},
-"skip_quote_first": {
-    "description": "跳过第一次@引用",
-    "type": "bool",
-    "default": true,
-    "hint": "如果@对象是被引用消息的发送者，跳过一次@对象的头像。"
-},
-"skip_llm_at_first": {
-    "description": "LLM跳过第一次@机器人",
-    "type": "bool",
-    "default": true,
-    "hint": "通过@机器人触发LLM函数调用工具，跳过一次机器人的头像。"
-}
-}
-},
-"llm_tool_settings": {
-"description": "LLM函数调用工具配置",
-"type": "object",
-"hint": "",
-"items": {
-"llm_tool_enabled": {
-    "description": "启用函数调用工具",
-    "type": "bool",
-    "default": true,
-    "hint": "通过LLM对话生成图片，建议在AstrBot面板的配置文件中调整「工具调用超时时间」，以适应图片生成需要"
-}
-}
-},
+    "preference_config": {
+        "description": "偏好设置",
+        "type": "object",
+        "hint": "以下配置因个人使用需求而异，暂无两全之策。跳过At头像的三个选项共用一个计数。",
+        "items": {
+            "skip_at_first": {
+                "description": "跳过第一次@机器人",
+                "type": "bool",
+                "default": true,
+                "hint": "通过@唤醒机器人时，跳过一次机器人的头像。"
+            },
+            "skip_quote_first": {
+                "description": "跳过第一次@引用",
+                "type": "bool",
+                "default": true,
+                "hint": "如果@对象是被引用消息的发送者，跳过一次@对象的头像。"
+            },
+            "skip_llm_at_first": {
+                "description": "LLM跳过第一次@机器人",
+                "type": "bool",
+                "default": true,
+                "hint": "通过@机器人触发LLM函数调用工具，跳过一次机器人的头像。"
+            }
+        }
+    },
+    "llm_tool_settings": {
+        "description": "LLM函数调用工具配置",
+        "type": "object",
+        "hint": "",
+        "items": {
+            "llm_tool_enabled": {
+                "description": "启用函数调用工具",
+                "type": "bool",
+                "default": true,
+                "hint": "通过LLM对话生成图片，建议在AstrBot面板的配置文件中调整「工具调用超时时间」，以适应图片生成需要"
+            }
+        }
+    },
     "save_images": {
         "description": "图片存储",
         "type": "object",
