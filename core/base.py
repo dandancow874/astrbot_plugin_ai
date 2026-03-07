@@ -21,6 +21,9 @@ class BaseProvider(ABC):
 
     _registry: ClassVar[dict[str, type["BaseProvider"]]] = {}
     """提供商类注册表"""
+    
+    # 全局Key轮询索引记录
+    _rotation_index_map: ClassVar[dict[str, int]] = {}
 
     session: AsyncSession
     aiohttp_session: ClientSession | None
@@ -63,55 +66,68 @@ class BaseProvider(ABC):
     def get_provider_class(cls, api_type: str) -> type["BaseProvider"] | None:
         return cls._registry.get(api_type, None)
 
+    @classmethod
+    def get_next_rotation_index(cls, provider_name: str, key_count: int) -> int:
+        """获取下一个轮询索引，实现真正的交替使用"""
+        if provider_name not in cls._rotation_index_map:
+            cls._rotation_index_map[provider_name] = 0
+        
+        current_index = cls._rotation_index_map[provider_name]
+        next_index = (current_index + 1) % key_count
+        cls._rotation_index_map[provider_name] = next_index
+        
+        return current_index
+
     async def generate_images(
         self,
         provider_config: ProviderConfig,
         params: dict,
         image_b64_list: list[tuple[str, str]],
     ) -> tuple[list[tuple[str, str]] | None, str | None]:
-        """图片生成调度方法"""
+        """图片生成调度方法 - 实现真正的交替轮询"""
         key_list_len = len(provider_config.keys)
         if key_list_len == 0:
             return None, "图片生成失败：未配置 API Key"
-        current_index = random.randrange(key_list_len)
-        # 轮询使用 API Key
-        err = None
-        for key_ in range(key_list_len):
-            # 获取下一个 Key 索引
-            current_index = get_key_index(current_index, key_list_len)
-            # 重试机制
-            for i in range(self.def_common_config.max_retry):
-                if provider_config.stream:
-                    images_result, status, err = await self._call_stream_api(
-                        provider_config=provider_config,
-                        api_key=provider_config.keys[current_index],
-                        params=params,
-                        image_b64_list=image_b64_list,
-                    )
-                else:
-                    images_result, status, err = await self._call_api(
-                        provider_config=provider_config,
-                        api_key=provider_config.keys[current_index],
-                        params=params,
-                        image_b64_list=image_b64_list,
-                    )
-                if images_result:
-                    return images_result, None
-                if status == 404 and isinstance(err, str) and err.strip():
-                    api_url = (provider_config.api_url or "").strip()
-                    if api_url and api_url not in err:
-                        err = f"{err.strip()}（{api_url}）"
-                if self.def_common_config.smart_retry and not self.should_retry(status):
-                    break
-                logger.warning(
-                    f"图片生成失败，正在重试 {provider_config.name} 当前Key ({i + 1}/ {self.def_common_config.max_retry})"
+        
+        # 获取本次应该使用的Key索引（真正的轮询交替）
+        current_index = self.get_next_rotation_index(provider_config.name, key_list_len)
+        api_key = provider_config.keys[current_index]
+        
+        logger.info(f"[{self.api_type}] 轮询使用 {provider_config.name} 的第 {current_index + 1}/{key_list_len} 个API Key")
+        
+        # 只重试当前Key，不切换到其他Key（实现真正的交替）
+        for i in range(self.def_common_config.max_retry):
+            if provider_config.stream:
+                images_result, status, err = await self._call_stream_api(
+                    provider_config=provider_config,
+                    api_key=api_key,
+                    params=params,
+                    image_b64_list=image_b64_list,
                 )
             else:
-                if key_ < key_list_len - 1:
-                    logger.warning(
-                        f"图片生成失败，切换到 {provider_config.name} 下一个Key"
-                    )
-        return None, err or "图片生成失败：所有 Key 均已用尽或不可用"
+                images_result, status, err = await self._call_api(
+                    provider_config=provider_config,
+                    api_key=api_key,
+                    params=params,
+                    image_b64_list=image_b64_list,
+                )
+            
+            if images_result:
+                return images_result, None
+            
+            if status == 404 and isinstance(err, str) and err.strip():
+                api_url = (provider_config.api_url or "").strip()
+                if api_url and api_url not in err:
+                    err = f"{err.strip()}（{api_url}）"
+            
+            if self.def_common_config.smart_retry and not self.should_retry(status):
+                break
+            
+            logger.warning(
+                f"[{self.api_type}] API Key ({current_index + 1}/{key_list_len}) 重试 ({i + 1}/{self.def_common_config.max_retry}): {err}"
+            )
+        
+        return None, err or f"图片生成失败：API Key ({current_index + 1}/{key_list_len}) 重试 {self.def_common_config.max_retry} 次后仍失败"
 
     def should_retry(self, status) -> bool:
         if status in self.RETRY_STATUS_CODES:
