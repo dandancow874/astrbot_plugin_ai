@@ -956,12 +956,18 @@ class BigBanana(Star):
             if existing_params:
                 existing_model = existing_params.get("model", "")
                 existing_ar = existing_params.get("aspect_ratio", "")
-                # 解析预设行以获取期望的 model 和 aspect_ratio
+                existing_n = existing_params.get("n", "")
+                # 解析预设行以获取期望的 model、aspect_ratio 和 n
                 _, parsed_params = self.parsing_prompt_params(prompt_line)
                 expected_model = parsed_params.get("model", "")
                 expected_ar = parsed_params.get("aspect_ratio", "")
-                # 如果模型或宽高比不匹配，需要更新
-                if existing_model != expected_model or existing_ar != expected_ar:
+                expected_n = parsed_params.get("n", "")
+                # 如果模型、宽高比或数量不匹配，需要更新
+                if (
+                    existing_model != expected_model
+                    or existing_ar != expected_ar
+                    or existing_n != expected_n
+                ):
                     need_update = True
 
             if need_update:
