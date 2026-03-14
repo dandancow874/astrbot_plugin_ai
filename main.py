@@ -1807,7 +1807,9 @@ class BigBanana(Star):
         params["__trigger_cmd__"] = cmd
         # 先从预设提示词参数字典字典中取出提示词
         preset_prompt = params.get("prompt", "{{user_text}}")
-
+        logger.info(
+            f"[BIG BANANA] 预设参数: model={params.get('model')}, min_images={params.get('min_images')}"
+        )
         _, user_params = self.parsing_prompt_params(message_str)
         user_overrode_min_images = "min_images" in user_params
         user_overrode_image_size = "image_size" in user_params
