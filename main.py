@@ -944,8 +944,8 @@ class BigBanana(Star):
                 self.prompt_dict[cmd] = params
 
         fixed_prompts: dict[str, str] = {
-            "gp1": "gp1 {{user_text}} --min_images 0 --model grok-imagine-1.0 --ar 9:16",
-            "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit --ar 9:16",
+            "gp1": "gp1 {{user_text}} --min_images 0 --model grok-imagine-1.0 --aspect_ratio 9:16",
+            "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit --aspect_ratio 9:16",
         }
         updated_prompts = False
         for trigger, prompt_line in fixed_prompts.items():
@@ -954,11 +954,13 @@ class BigBanana(Star):
             need_update = False
             if existing_params:
                 existing_model = existing_params.get("model", "")
-                # 解析预设行以获取期望的 model
+                existing_ar = existing_params.get("aspect_ratio", "")
+                # 解析预设行以获取期望的 model 和 aspect_ratio
                 _, parsed_params = self.parsing_prompt_params(prompt_line)
                 expected_model = parsed_params.get("model", "")
-                # 如果模型不匹配，需要更新
-                if existing_model != expected_model:
+                expected_ar = parsed_params.get("aspect_ratio", "")
+                # 如果模型或宽高比不匹配，需要更新
+                if existing_model != expected_model or existing_ar != expected_ar:
                     need_update = True
 
             if need_update:
@@ -1840,7 +1842,7 @@ class BigBanana(Star):
         # 先从预设提示词参数字典字典中取出提示词
         preset_prompt = params.get("prompt", "{{user_text}}")
         logger.info(
-            f"[BIG BANANA] 预设参数: model={params.get('model')}, min_images={params.get('min_images')}"
+            f"[BIG BANANA] 解析结果: cmd={cmd}, 预设model={params.get('model')}, 预设aspect_ratio={params.get('aspect_ratio')}, 预设min_images={params.get('min_images')}"
         )
         _, user_params = self.parsing_prompt_params(message_str)
         user_overrode_min_images = "min_images" in user_params
