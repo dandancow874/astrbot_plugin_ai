@@ -1030,8 +1030,8 @@ class OpenAIImagesProvider(BaseProvider):
         else:
             # 没有宽高比时，计算默认尺寸
             mapped_size = self._map_image_size(params.get("image_size"))
-        if mapped_size:
-            body["size"] = mapped_size
+            if mapped_size:
+                body["size"] = mapped_size
 
         try:
             impersonate = (
