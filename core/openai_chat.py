@@ -1010,6 +1010,19 @@ class OpenAIImagesProvider(BaseProvider):
             "response_format": "b64_json",
         }
 
+        # 处理生成数量参数 n
+        n_param = params.get("n")
+        if isinstance(n_param, str):
+            try:
+                n_value = int(n_param)
+                if 1 <= n_value <= 10:
+                    body["n"] = n_value
+            except (ValueError, TypeError):
+                pass
+        elif isinstance(n_param, int):
+            if 1 <= n_param <= 10:
+                body["n"] = n_param
+
         aspect_ratio = params.get("aspect_ratio")
         if isinstance(aspect_ratio, str) and aspect_ratio.strip():
             # 如果有宽高比，直接传递给 Grok（支持宽高比字符串：16:9, 9:16, 1:1, 2:3, 3:2）

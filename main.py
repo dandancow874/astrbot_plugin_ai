@@ -38,6 +38,7 @@ PARAMS_LIST = [
     "preset_append",
     "gather_mode",
     "model",
+    "n",
     "provider",
     "preset",
     "q",
@@ -944,8 +945,8 @@ class BigBanana(Star):
                 self.prompt_dict[cmd] = params
 
         fixed_prompts: dict[str, str] = {
-            "gp1": "gp1 {{user_text}} --min_images 0 --model grok-imagine-1.0 --aspect_ratio 2:3",
-            "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit --aspect_ratio 2:3",
+            "gp1": "gp1 {{user_text}} --min_images 0 --model grok-imagine-1.0 --aspect_ratio 2:3 --n 2",
+            "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit --aspect_ratio 2:3 --n 2",
         }
         updated_prompts = False
         for trigger, prompt_line in fixed_prompts.items():
