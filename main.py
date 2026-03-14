@@ -944,8 +944,8 @@ class BigBanana(Star):
                 self.prompt_dict[cmd] = params
 
         fixed_prompts: dict[str, str] = {
-            "gp1": "gp1 {{user_text}} --min_images 0 --model grok-imagine-1.0 --aspect_ratio 9:16",
-            "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit --aspect_ratio 9:16",
+            "gp1": "gp1 {{user_text}} --min_images 0 --model grok-imagine-1.0 --aspect_ratio 2:3",
+            "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit --aspect_ratio 2:3",
         }
         updated_prompts = False
         for trigger, prompt_line in fixed_prompts.items():
@@ -1841,18 +1841,12 @@ class BigBanana(Star):
         params["__trigger_cmd__"] = cmd
         # 先从预设提示词参数字典字典中取出提示词
         preset_prompt = params.get("prompt", "{{user_text}}")
-        logger.info(
-            f"[BIG BANANA] 解析结果: cmd={cmd}, 预设model={params.get('model')}, 预设aspect_ratio={params.get('aspect_ratio')}, 预设min_images={params.get('min_images')}"
-        )
         _, user_params = self.parsing_prompt_params(message_str)
         user_overrode_min_images = "min_images" in user_params
         user_overrode_image_size = "image_size" in user_params
         user_overrode_model = "model" in user_params
         user_overrode_aspect_ratio = "aspect_ratio" in user_params
         params["__user_overrode_model__"] = user_overrode_model
-        logger.info(
-            f"[BIG BANANA] 用户参数: aspect_ratio={user_params.get('aspect_ratio')}, model={user_params.get('model')}"
-        )
         preset_name = user_params.pop("preset", None)
         user_prompt = user_params.get("prompt", "anything").strip()
 
@@ -1893,9 +1887,6 @@ class BigBanana(Star):
             params["prompt"] = final_prompt
         else:
             params.update({k: v for k, v in user_params.items() if k != "prompt"})
-            logger.info(
-                f"[BIG BANANA] 合并后参数(无preset): aspect_ratio={params.get('aspect_ratio')}, model={params.get('model')}"
-            )
 
         if not user_overrode_model:
             selected_model = self.user_selected_provider_model.get(

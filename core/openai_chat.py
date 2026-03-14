@@ -1012,15 +1012,11 @@ class OpenAIImagesProvider(BaseProvider):
 
         aspect_ratio = params.get("aspect_ratio")
         if isinstance(aspect_ratio, str) and aspect_ratio.strip():
-            # 如果有宽高比，计算适配的 size
-            mapped_size = self._map_image_size(
-                params.get("image_size"), aspect_ratio.strip()
-            )
-            # 同时也注入 aspect_ratio 字段，以防万一
-            body["aspect_ratio"] = aspect_ratio.strip()
+            # 如果有宽高比，直接传递给 Grok（支持宽高比字符串：16:9, 9:16, 1:1, 2:3, 3:2）
+            body["size"] = aspect_ratio.strip()
         else:
+            # 没有宽高比时，计算默认尺寸
             mapped_size = self._map_image_size(params.get("image_size"))
-
         if mapped_size:
             body["size"] = mapped_size
 
