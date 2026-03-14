@@ -15,6 +15,8 @@
             "nj1 {{user_text}} --min_images 0 ",
             "mj2 {{user_text}} --min_images 1 ",
             "nj2 {{user_text}} --min_images 1 ",
+            "gp1 {{user_text}} --min_images 0 --model grok-imagine-1.0",
+            "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit",
             "反推 详细描述这张图片 --min_images 1"
         ],
         "hint": "格式1: 触发词 提示词 --参数1 参数值1 --参数2 参数值2。格式2: [触发词1,触发词2] 提示词 --参数1 参数值1 --参数2 参数值2。触发词和触发词列表不能有空格。若省略参数值，则视为布尔值true。占位提示词：{{user_text}}，占位提示词会被消息内容覆盖，用于自定义提示词，可以在占位提示词前后添加固定的预设提示词。可选的参数请参考 README.md。触发词冲突可能会相互覆盖。"
@@ -251,6 +253,48 @@
                         "type": "string",
                         "default": "",
                         "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                    }
+                }
+            }
+        }
+    },
+    "grok_config": {
+        "description": "🤖 Grok 模型配置",
+        "type": "object",
+        "hint": "gp1, gp2 会使用这里配置的 URL 与 API Key。",
+        "items": {
+            "enabled": {
+                "description": "启用",
+                "type": "bool",
+                "default": true
+            },
+            "primary": {
+                "description": "主提供商",
+                "type": "object",
+                "items": {
+                    "api_url": {
+                        "description": "OpenAI兼容 URL",
+                        "type": "string",
+                        "default": "http://localhost:8000/v1",
+                        "hint": "填 Base URL，例如 http://localhost:8000/v1。插件会自动处理文生图和图生图请求。"
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "直接粘贴 Key。多个 Key 可用英文逗号或换行分隔。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": false,
+                        "hint": "仅影响此模型的接口请求。关闭后将绕过 TLS 验证（有安全风险）。"
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "",
+                        "hint": "仅影响此模型的接口请求。用于部分逆向/反代站点的 TLS 指纹校验。"
                     }
                 }
             }
