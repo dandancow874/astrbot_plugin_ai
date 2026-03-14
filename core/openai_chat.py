@@ -1023,15 +1023,27 @@ class OpenAIImagesProvider(BaseProvider):
             if 1 <= n_param <= 10:
                 body["n"] = n_param
 
+        # 处理宽高比参数，映射到具体尺寸
         aspect_ratio = params.get("aspect_ratio")
         if isinstance(aspect_ratio, str) and aspect_ratio.strip():
-            # 如果有宽高比，直接传递给 Grok（支持宽高比字符串：16:9, 9:16, 1:1, 2:3, 3:2）
-            body["size"] = aspect_ratio.strip()
+            # Grok API 只支持具体尺寸，需要将宽高比映射到具体尺寸
+            # 允许的尺寸: 1024x1024, 1024x1792, 1280x720, 1792x1024, 720x1280
+            grok_ar_map = {
+                "16:9": "1280x720",
+                "9:16": "720x1280",
+                "1:1": "1024x1024",
+                "2:3": "1024x1792",  # 使用 9:16 尺寸作为替代
+                "3:2": "1792x1024",  # 使用 16:10 尺寸作为替代
+            }
+            ar_key = aspect_ratio.strip()
+            if ar_key in grok_ar_map:
+                body["size"] = grok_ar_map[ar_key]
+            else:
+                # 默认使用 1:1
+                body["size"] = "1024x1024"
         else:
-            # 没有宽高比时，计算默认尺寸
-            mapped_size = self._map_image_size(params.get("image_size"))
-            if mapped_size:
-                body["size"] = mapped_size
+            # 没有宽高比时，使用默认尺寸
+            body["size"] = "1024x1024"
 
         try:
             impersonate = (
