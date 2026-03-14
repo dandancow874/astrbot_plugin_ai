@@ -1848,7 +1848,11 @@ class BigBanana(Star):
         user_overrode_min_images = "min_images" in user_params
         user_overrode_image_size = "image_size" in user_params
         user_overrode_model = "model" in user_params
+        user_overrode_aspect_ratio = "aspect_ratio" in user_params
         params["__user_overrode_model__"] = user_overrode_model
+        logger.info(
+            f"[BIG BANANA] 用户参数: aspect_ratio={user_params.get('aspect_ratio')}, model={user_params.get('model')}"
+        )
         preset_name = user_params.pop("preset", None)
         user_prompt = user_params.get("prompt", "anything").strip()
 
@@ -1883,9 +1887,15 @@ class BigBanana(Star):
                 selected_params.pop("__model_name__", None)
             params.update(selected_params)
             params.update({k: v for k, v in user_params.items() if k != "prompt"})
+            logger.info(
+                f"[BIG BANANA] 合并后参数: aspect_ratio={params.get('aspect_ratio')}, model={params.get('model')}"
+            )
             params["prompt"] = final_prompt
         else:
             params.update({k: v for k, v in user_params.items() if k != "prompt"})
+            logger.info(
+                f"[BIG BANANA] 合并后参数(无preset): aspect_ratio={params.get('aspect_ratio')}, model={params.get('model')}"
+            )
 
         if not user_overrode_model:
             selected_model = self.user_selected_provider_model.get(
