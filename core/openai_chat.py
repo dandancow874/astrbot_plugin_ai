@@ -6,6 +6,7 @@ import time
 from urllib.parse import urlparse
 
 from aiohttp import ClientTimeout
+
 try:
     from curl_cffi import CurlMime, CurlHttpVersion
 except Exception:
@@ -76,7 +77,7 @@ class OpenAIChatProvider(BaseProvider):
         }
         model = (params.get("model") or provider_config.model or "").strip()
         # 移除之前的强制映射逻辑，允许 nano-banana-pro 直接透传
-        
+
         prompt = params.get("prompt", "anything")
         urls = params.get("__source_image_urls__")
         if not isinstance(urls, list):
@@ -93,7 +94,7 @@ class OpenAIChatProvider(BaseProvider):
         image_size = params.get("image_size")
         if isinstance(image_size, str) and image_size.strip() in {"1K", "2K", "4K"}:
             payload["imageSize"] = image_size.strip()
-        
+
         aspect_ratio = params.get("aspect_ratio")
         if isinstance(aspect_ratio, str):
             ar = aspect_ratio.strip()
@@ -133,7 +134,11 @@ class OpenAIChatProvider(BaseProvider):
             if isinstance(resp_text, str):
                 stripped = resp_text.lstrip()
                 lowered = stripped.lower()
-                if lowered.startswith("<!doctype html") or lowered.startswith("<html") or "<html" in lowered:
+                if (
+                    lowered.startswith("<!doctype html")
+                    or lowered.startswith("<html")
+                    or "<html" in lowered
+                ):
                     return (
                         None,
                         502,
@@ -141,11 +146,15 @@ class OpenAIChatProvider(BaseProvider):
                     )
 
             if response.status_code != 200:
-                detail = self._extract_error_message(resp_text if isinstance(resp_text, str) else "")
+                detail = self._extract_error_message(
+                    resp_text if isinstance(resp_text, str) else ""
+                )
                 return (
                     None,
                     response.status_code,
-                    f"图片生成失败: {detail}" if detail else f"图片生成失败: 状态码 {response.status_code}",
+                    f"图片生成失败: {detail}"
+                    if detail
+                    else f"图片生成失败: 状态码 {response.status_code}",
                 )
 
             json_text = resp_text if isinstance(resp_text, str) else ""
@@ -155,7 +164,9 @@ class OpenAIChatProvider(BaseProvider):
                 result = json.loads(json_text) if isinstance(json_text, str) else {}
             except Exception:
                 result = {}
-            detail = self._extract_error_message(json_text if isinstance(json_text, str) else "")
+            detail = self._extract_error_message(
+                json_text if isinstance(json_text, str) else ""
+            )
             if detail and not self._extract_grsai_result_urls(result):
                 return None, 400, f"图片生成失败: {detail}"
 
@@ -223,12 +234,20 @@ class OpenAIChatProvider(BaseProvider):
         if isinstance(data.get("message"), str) and data["message"].strip():
             return data["message"].strip()
         err = data.get("error")
-        if isinstance(err, dict) and isinstance(err.get("message"), str) and err["message"].strip():
+        if (
+            isinstance(err, dict)
+            and isinstance(err.get("message"), str)
+            and err["message"].strip()
+        ):
             return err["message"].strip()
         detail = data.get("detail")
         if isinstance(detail, list) and detail:
             first = detail[0]
-            if isinstance(first, dict) and isinstance(first.get("msg"), str) and first["msg"].strip():
+            if (
+                isinstance(first, dict)
+                and isinstance(first.get("msg"), str)
+                and first["msg"].strip()
+            ):
                 return first["msg"].strip()
         return None
 
@@ -306,7 +325,9 @@ class OpenAIChatProvider(BaseProvider):
         if urls_from_text:
             media_urls.extend(urls_from_text)
 
-        media_urls = list(dict.fromkeys([u for u in media_urls if isinstance(u, str) and u.strip()]))
+        media_urls = list(
+            dict.fromkeys([u for u in media_urls if isinstance(u, str) and u.strip()])
+        )
         return b64_images, media_urls, full_text
 
     @staticmethod
@@ -389,7 +410,11 @@ class OpenAIChatProvider(BaseProvider):
             if isinstance(resp_text, str):
                 stripped = resp_text.lstrip()
                 lowered = stripped.lower()
-                if lowered.startswith("<!doctype html") or lowered.startswith("<html") or "<html" in lowered:
+                if (
+                    lowered.startswith("<!doctype html")
+                    or lowered.startswith("<html")
+                    or "<html" in lowered
+                ):
                     return (
                         None,
                         502,
@@ -398,12 +423,17 @@ class OpenAIChatProvider(BaseProvider):
 
             result = response.json()
             if response.status_code == 200 and isinstance(result, dict):
-                if isinstance(result.get("msg"), str) and str(result.get("code", "")).strip():
+                if (
+                    isinstance(result.get("msg"), str)
+                    and str(result.get("code", "")).strip()
+                ):
                     msg = result.get("msg", "").strip()
                     if msg:
                         return None, 400, f"图片生成失败: {msg}"
             if response.status_code == 200:
-                b64_images, media_urls, full_text = self._collect_media_from_payload(result)
+                b64_images, media_urls, full_text = self._collect_media_from_payload(
+                    result
+                )
                 if media_urls:
                     b64_images += await self.downloader.fetch_media(media_urls)
                 b64_images = [(mime, b64) for mime, b64 in b64_images if b64]
@@ -435,14 +465,24 @@ class OpenAIChatProvider(BaseProvider):
                             alt_text = getattr(alt_resp, "text", "")
                             if isinstance(alt_text, str):
                                 stripped = alt_text.lstrip().lower()
-                                if stripped.startswith("<!doctype html") or stripped.startswith("<html") or "<html" in stripped:
+                                if (
+                                    stripped.startswith("<!doctype html")
+                                    or stripped.startswith("<html")
+                                    or "<html" in stripped
+                                ):
                                     continue
                             alt_result = alt_resp.json()
                             if alt_resp.status_code == 200:
-                                b64_images, media_urls, full_text = self._collect_media_from_payload(alt_result)
+                                b64_images, media_urls, full_text = (
+                                    self._collect_media_from_payload(alt_result)
+                                )
                                 if media_urls:
-                                    b64_images += await self.downloader.fetch_media(media_urls)
-                                b64_images = [(mime, b64) for mime, b64 in b64_images if b64]
+                                    b64_images += await self.downloader.fetch_media(
+                                        media_urls
+                                    )
+                                b64_images = [
+                                    (mime, b64) for mime, b64 in b64_images if b64
+                                ]
                                 if b64_images:
                                     return b64_images, 200, None
                                 if isinstance(full_text, str) and full_text.strip():
@@ -456,16 +496,24 @@ class OpenAIChatProvider(BaseProvider):
                         404,
                         f"图片生成失败: {detail}（{provider_config.api_url}）",
                     )
-                return None, 404, f"图片生成失败：API 地址不存在（{provider_config.api_url}）"
+                return (
+                    None,
+                    404,
+                    f"图片生成失败：API 地址不存在（{provider_config.api_url}）",
+                )
 
             logger.error(
                 f"[BIG BANANA] 图片生成失败，状态码: {response.status_code}, 响应内容: {resp_text[:1024]}"
             )
-            detail = self._extract_error_message(resp_text if isinstance(resp_text, str) else "")
+            detail = self._extract_error_message(
+                resp_text if isinstance(resp_text, str) else ""
+            )
             return (
                 None,
                 response.status_code,
-                f"图片生成失败: {detail}" if detail else f"图片生成失败: 状态码 {response.status_code}",
+                f"图片生成失败: {detail}"
+                if detail
+                else f"图片生成失败: 状态码 {response.status_code}",
             )
         except Timeout as e:
             logger.error(f"[BIG BANANA] 网络请求超时: {e}")
@@ -475,14 +523,22 @@ class OpenAIChatProvider(BaseProvider):
             text_preview = resp_text[:1024] if isinstance(resp_text, str) else ""
             stripped = text_preview.lstrip()
             lowered = stripped.lower()
-            if lowered.startswith("<!doctype html") or lowered.startswith("<html") or "<html" in lowered:
+            if (
+                lowered.startswith("<!doctype html")
+                or lowered.startswith("<html")
+                or "<html" in lowered
+            ):
                 return (
                     None,
                     response.status_code,
                     f"图片生成失败：上游返回HTML，可能是鉴权失败或接口路径错误（{provider_config.api_url}）",
                 )
             if response.status_code == 404:
-                return None, 404, f"图片生成失败：API 地址不存在（{provider_config.api_url}）"
+                return (
+                    None,
+                    404,
+                    f"图片生成失败：API 地址不存在（{provider_config.api_url}）",
+                )
             logger.error(
                 f"[BIG BANANA] JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{text_preview}"
             )
@@ -578,10 +634,14 @@ class OpenAIChatProvider(BaseProvider):
                                 try:
                                     json_data = json.loads(line_data)
                                     for item in json_data.get("choices", []):
-                                        content = item.get("delta", {}).get("content", "")
+                                        content = item.get("delta", {}).get(
+                                            "content", ""
+                                        )
                                         if isinstance(content, str) and content:
                                             content_buf_parts.append(content)
-                                        rc = item.get("delta", {}).get("reasoning_content", "")
+                                        rc = item.get("delta", {}).get(
+                                            "reasoning_content", ""
+                                        )
                                         if isinstance(rc, str) and rc:
                                             reasoning_buf_parts.append(rc)
                                 except json.JSONDecodeError:
@@ -633,6 +693,7 @@ class OpenAIChatProvider(BaseProvider):
                 req_kwargs["impersonate"] = impersonate
             if self._is_grsai(provider_config.api_url) and CurlHttpVersion is not None:
                 req_kwargs["http_version"] = CurlHttpVersion.V1_1
+
             async def post_request(use_data: bool):
                 if use_data:
                     payload = json.dumps(openai_context, ensure_ascii=False)
@@ -667,7 +728,9 @@ class OpenAIChatProvider(BaseProvider):
                     result = await read_response_text(response)
             if response.status_code == 200:
                 stripped = (result or "").lstrip()
-                if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
+                if stripped.startswith("<!DOCTYPE html") or stripped.startswith(
+                    "<html"
+                ):
                     return None, 502, "上游返回HTML，可能是鉴权失败或接口路径错误"
                 reasoning_content = ""
                 content_buf_parts: list[str] = []
@@ -748,12 +811,12 @@ class OpenAIChatProvider(BaseProvider):
             ],
             "stream": params.get("stream", False),
         }
-        
+
         # 注入 aspect_ratio 参数，适配 flow2api 等支持该参数的提供商
         aspect_ratio = params.get("aspect_ratio")
         if isinstance(aspect_ratio, str) and aspect_ratio.strip():
             context["aspect_ratio"] = aspect_ratio.strip()
-            
+
         return context
 
 
@@ -771,13 +834,21 @@ class OpenAIImagesProvider(BaseProvider):
     def _resolve_images_url(api_url: str, prefer_edits: bool) -> str:
         base = (api_url or "").strip().rstrip("/")
         lower = base.lower()
-        if "/images/" in lower or lower.endswith("/edits") or lower.endswith("/generations"):
+        if (
+            "/images/" in lower
+            or lower.endswith("/edits")
+            or lower.endswith("/generations")
+        ):
             return base
 
         if base.endswith("/v1/async"):
-            return f"{base}/images/edits" if prefer_edits else f"{base}/images/generations"
+            return (
+                f"{base}/images/edits" if prefer_edits else f"{base}/images/generations"
+            )
         if base.endswith("/v1"):
-            return f"{base}/images/edits" if prefer_edits else f"{base}/images/generations"
+            return (
+                f"{base}/images/edits" if prefer_edits else f"{base}/images/generations"
+            )
 
         if prefer_edits:
             return f"{base}/v1/images/edits"
@@ -803,15 +874,33 @@ class OpenAIImagesProvider(BaseProvider):
         return "image/png"
 
     @staticmethod
-    def _map_image_size(image_size: object, aspect_ratio: str | None = None) -> str | None:
+    def _map_image_size(
+        image_size: object, aspect_ratio: str | None = None
+    ) -> str | None:
         """
         根据 image_size 和 aspect_ratio 计算最终的分辨率字符串 (WxH)。
         如果提供了 aspect_ratio，会尝试适配比例。
+        支持 Grok 格式的宽高比：16:9, 9:16 等，映射到 Grok 支持的尺寸。
         """
         if not isinstance(image_size, str):
             return None
         size = image_size.strip().upper()
-        
+
+        # Grok 宽高比映射 (Grok 使用固定尺寸，忽略 image_size)
+        # Grok 支持的尺寸: 960x960 (1:1), 1168x784 (3:2), 720x1280 (9:16), 1280x720 (16:9), 784x1168 (2:3)
+        if aspect_ratio and aspect_ratio.lower() != "default":
+            grok_ar_map = {
+                "16:9": "1280x720",
+                "9:16": "720x1280",
+                "1:1": "960x960",
+                "3:2": "1168x784",
+                "2:3": "784x1168",
+            }
+            ar_key = aspect_ratio.strip()
+            if ar_key in grok_ar_map:
+                # 使用 Grok 映射（忽略 image_size）
+                return grok_ar_map[ar_key]
+
         # 基础分辨率映射 (1:1)
         base_w, base_h = 1024, 1024
         if size == "1K":
@@ -826,7 +915,7 @@ class OpenAIImagesProvider(BaseProvider):
         else:
             # 默认为 1K 如果无法解析
             base_w, base_h = 1024, 1024
-            
+
         if not aspect_ratio or aspect_ratio.lower() == "default":
             return f"{base_w}x{base_h}"
 
@@ -840,7 +929,8 @@ class OpenAIImagesProvider(BaseProvider):
         # DALL-E 3 标准分辨率
         STANDARD_SIZES = [
             (1024, 1024),
-            (1792, 1024), (1024, 1792),
+            (1792, 1024),
+            (1024, 1792),
         ]
 
         target_area = base_w * base_h
@@ -852,14 +942,14 @@ class OpenAIImagesProvider(BaseProvider):
             # 允许 5% 的宽高比误差
             if abs(ratio - target_ratio) / target_ratio > 0.05:
                 continue
-            
+
             # 评分标准：面积差异 + 宽高比差异 (加权)
             area_diff = abs((w * h) - target_area) / target_area
             ratio_diff = abs(ratio - target_ratio)
-            
+
             # 如果目标是 2K (area > 2M)，则优先匹配大分辨率
             # 如果目标是 1K (area <= 1M)，则优先匹配小分辨率
-            
+
             score = area_diff + ratio_diff * 2
             if score < min_score:
                 min_score = score
@@ -871,13 +961,14 @@ class OpenAIImagesProvider(BaseProvider):
         # 如果没有匹配到标准分辨率，回退到动态计算
         # 简单的面积守恒或长边适配逻辑
         import math
+
         new_h = math.sqrt(target_area / target_ratio)
         new_w = new_h * target_ratio
-        
+
         # 通用计算
         final_w = int(round(new_w / 64) * 64)
         final_h = int(round(new_h / 64) * 64)
-        
+
         return f"{final_w}x{final_h}"
 
     async def _call_api(
@@ -918,11 +1009,13 @@ class OpenAIImagesProvider(BaseProvider):
             "model": params.get("model", provider_config.model),
             "response_format": "b64_json",
         }
-        
+
         aspect_ratio = params.get("aspect_ratio")
         if isinstance(aspect_ratio, str) and aspect_ratio.strip():
             # 如果有宽高比，计算适配的 size
-            mapped_size = self._map_image_size(params.get("image_size"), aspect_ratio.strip())
+            mapped_size = self._map_image_size(
+                params.get("image_size"), aspect_ratio.strip()
+            )
             # 同时也注入 aspect_ratio 字段，以防万一
             body["aspect_ratio"] = aspect_ratio.strip()
         else:
@@ -930,7 +1023,6 @@ class OpenAIImagesProvider(BaseProvider):
 
         if mapped_size:
             body["size"] = mapped_size
-
 
         try:
             impersonate = (
@@ -961,7 +1053,7 @@ class OpenAIImagesProvider(BaseProvider):
             if response.status_code == 200:
                 b64_images: list[tuple[str, str]] = []
                 images_url: list[str] = []
-                for item in (result.get("data") or []):
+                for item in result.get("data") or []:
                     if not isinstance(item, dict):
                         continue
                     b64 = item.get("b64_json")
@@ -992,9 +1084,19 @@ class OpenAIImagesProvider(BaseProvider):
                 if isinstance(result.get("message"), str):
                     detail = result.get("message")
                 err_obj = result.get("error")
-                if not detail and isinstance(err_obj, dict) and isinstance(err_obj.get("message"), str):
+                if (
+                    not detail
+                    and isinstance(err_obj, dict)
+                    and isinstance(err_obj.get("message"), str)
+                ):
                     detail = err_obj.get("message")
-            return None, response.status_code, f"图片生成失败: {detail}" if detail else f"图片生成失败: 状态码 {response.status_code}"
+            return (
+                None,
+                response.status_code,
+                f"图片生成失败: {detail}"
+                if detail
+                else f"图片生成失败: 状态码 {response.status_code}",
+            )
         except Timeout as e:
             logger.error(f"[BIG BANANA] 网络请求超时: {e}")
             return None, 408, "图片生成失败：响应超时"
@@ -1003,14 +1105,22 @@ class OpenAIImagesProvider(BaseProvider):
             text_preview = resp_text[:1024] if isinstance(resp_text, str) else ""
             stripped = text_preview.lstrip()
             lowered = stripped.lower()
-            if lowered.startswith("<!doctype html") or lowered.startswith("<html") or "<html" in lowered:
+            if (
+                lowered.startswith("<!doctype html")
+                or lowered.startswith("<html")
+                or "<html" in lowered
+            ):
                 return (
                     None,
                     response.status_code,
                     f"图片生成失败：上游返回HTML，可能是鉴权失败或接口路径错误（{provider_config.api_url}）",
                 )
             if response.status_code == 404:
-                return None, 404, f"图片生成失败：API 地址不存在（{provider_config.api_url}）"
+                return (
+                    None,
+                    404,
+                    f"图片生成失败：API 地址不存在（{provider_config.api_url}）",
+                )
             logger.error(
                 f"[BIG BANANA] JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{text_preview}"
             )
@@ -1049,7 +1159,9 @@ class OpenAIImagesProvider(BaseProvider):
             "model": params.get("model", provider_config.model),
             "response_format": "b64_json",
         }
-        mapped_size = self._map_image_size(params.get("image_size"), params.get("aspect_ratio"))
+        mapped_size = self._map_image_size(
+            params.get("image_size"), params.get("aspect_ratio")
+        )
         if mapped_size:
             form["size"] = mapped_size
 
@@ -1149,7 +1261,11 @@ class OpenAIImagesProvider(BaseProvider):
                             if isinstance(task_json.get("message"), str)
                             else None
                         )
-                        return None, 200, f"图片编辑失败：{msg or str(task_json.get('error'))}"
+                        return (
+                            None,
+                            200,
+                            f"图片编辑失败：{msg or str(task_json.get('error'))}",
+                        )
                     status = task_json.get("status")
                     if status == "success":
                         output = task_json.get("output")
@@ -1175,7 +1291,7 @@ class OpenAIImagesProvider(BaseProvider):
                 data = result.get("data")
                 if isinstance(data, dict):
                     data = [data]
-                for item in (data or []):
+                for item in data or []:
                     if not isinstance(item, dict):
                         continue
                     b64_out = item.get("b64_json")
@@ -1206,9 +1322,19 @@ class OpenAIImagesProvider(BaseProvider):
                 if isinstance(result.get("message"), str):
                     detail = result.get("message")
                 err_obj = result.get("error")
-                if not detail and isinstance(err_obj, dict) and isinstance(err_obj.get("message"), str):
+                if (
+                    not detail
+                    and isinstance(err_obj, dict)
+                    and isinstance(err_obj.get("message"), str)
+                ):
                     detail = err_obj.get("message")
-            return None, response.status_code, f"图片生成失败: {detail}" if detail else f"图片生成失败: 状态码 {response.status_code}"
+            return (
+                None,
+                response.status_code,
+                f"图片生成失败: {detail}"
+                if detail
+                else f"图片生成失败: 状态码 {response.status_code}",
+            )
         except Timeout as e:
             logger.error(f"[BIG BANANA] 网络请求超时: {e}")
             return None, 408, "图片生成失败：响应超时"
@@ -1217,7 +1343,11 @@ class OpenAIImagesProvider(BaseProvider):
             text_preview = resp_text[:1024] if isinstance(resp_text, str) else ""
             stripped = text_preview.lstrip()
             if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
-                return None, response.status_code, "图片生成失败：上游返回HTML，可能是鉴权失败或接口路径错误"
+                return (
+                    None,
+                    response.status_code,
+                    "图片生成失败：上游返回HTML，可能是鉴权失败或接口路径错误",
+                )
             if response.status_code == 404:
                 return None, 404, "图片生成失败：API 地址不存在"
             logger.error(
