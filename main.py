@@ -943,17 +943,49 @@ class BigBanana(Star):
                 existing_cmds.add(cmd)
                 self.prompt_dict[cmd] = params
 
-        fixed_prompts: dict[str, str] = {}
+        fixed_prompts: dict[str, str] = {
+            "gp1": "gp1 {{user_text}} --min_images 0 --model grok-imagine-1.0",
+            "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit",
+        }
         updated_prompts = False
         for trigger, prompt_line in fixed_prompts.items():
-            if trigger in existing_cmds:
-                continue
-            cmd_list, params = self.parsing_prompt_params(prompt_line)
-            self.prompt_list.append(prompt_line)
-            updated_prompts = True
-            for cmd in cmd_list:
-                existing_cmds.add(cmd)
-                self.prompt_dict[cmd] = params
+            # 检查是否需要更新预设
+            existing_params = self.prompt_dict.get(trigger)
+            need_update = False
+            if existing_params:
+                existing_model = existing_params.get("model", "")
+                # 解析预设行以获取期望的 model
+                _, parsed_params = self.parsing_prompt_params(prompt_line)
+                expected_model = parsed_params.get("model", "")
+                # 如果模型不匹配，需要更新
+                if existing_model != expected_model:
+                    need_update = True
+
+            if need_update:
+                # 更新预设
+                cmd_list, params = self.parsing_prompt_params(prompt_line)
+                # 更新 prompt_dict
+                for cmd in cmd_list:
+                    self.prompt_dict[cmd] = params
+                # 更新 prompt_list（找到旧的那一行并替换）
+                for i, line in enumerate(self.prompt_list):
+                    if line.startswith(f"{trigger} "):
+                        self.prompt_list[i] = prompt_line
+                        break
+                else:
+                    self.prompt_list.append(prompt_line)
+                updated_prompts = True
+                logger.info(
+                    f"[BIG BANANA] 更新预设: {trigger}, model={params.get('model')}"
+                )
+            elif trigger not in existing_cmds:
+                # 添加新预设
+                cmd_list, params = self.parsing_prompt_params(prompt_line)
+                self.prompt_list.append(prompt_line)
+                updated_prompts = True
+                for cmd in cmd_list:
+                    existing_cmds.add(cmd)
+                    self.prompt_dict[cmd] = params
 
         # 将模型触发词也加入到 prompt_dict 中，以便在 on_message 中能通过检查
         # 如果触发词已存在（即有预设提示词），则不做处理（预设提示词优先）
