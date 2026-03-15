@@ -2299,7 +2299,42 @@ class BigBanana(Star):
                 return None, "全部参考图片下载失败"
 
         # 发送绘图中提示
-        await event.send(MessageChain().message("🎨 在画了，请稍等一会..."))
+        model_display_name = params.get("__model_name__", "神秘画师").replace("-", " ")
+        drawing_messages = [
+            f"🎨 {model_display_name} 正在疯狂运转显卡，别催，再催显卡冒烟了！",
+            f"🎭 {model_display_name} 正在憋大招呢，艺术创作急不得！",
+            f"🧐 {model_display_name} 正在严肃思考：你这要求是不是有点太高了...",
+            f"🫠 {model_display_name} 被你的需求整不会了，正在努力理解中...",
+            f"🙃 {model_display_name} 正在思考人生，顺便给你画张图",
+            f"🤔 {model_display_name} 正在纠结：是画美点还是画丑点？",
+            f"🫢 {model_display_name} 发现你的需求有点复杂，正在疯狂加补丁...",
+            f"🥴 {model_display_name} 正在努力理解你的需求（可能需要翻译一下）",
+            f"😮‍💨 {model_display_name} 正在叹气：这届用户真难伺候...",
+            f"🧠 {model_display_name} 的GPU正在过热，请等待冷却（划掉）完成生成",
+            f"🫣 {model_display_name} 正在小心翼翼地画，怕被你骂...",
+            f"😏 {model_display_name} 正在考虑要不要偷懒画张应付的...",
+            f"🤷 {model_display_name} 正在随机生成，希望能碰上你喜欢的",
+            f"🤭 {model_display_name} 正在偷偷给你的prompt加点料...",
+            f"😌 {model_display_name} 正在冥想，等待艺术灵感降临",
+            f"🤫 {model_display_name} 正在偷偷摸摸地画，别打扰！",
+            f"😵 {model_display_name} 正在理解你的需求...理解失败，正在瞎画...",
+            f"🥺 {model_display_name} 正在努力画图，求不要挑刺...",
+            f"🫡 {model_display_name} 正在严肃认真地画画，假装很专业",
+            f"😶 {model_display_name} 正在面无表情地画，内心os很丰富",
+            f"🤨 {model_display_name} 正在质疑人生：为什么让我画这个？",
+            f"😪 {model_display_name} 正在打哈欠画图，质量可能受影响...",
+            f"🤢 {model_display_name} 正在消化你的需求，有点消化不良...",
+            f"😩 {model_display_name} 正在痛苦地创作，这需求也太刁钻了！",
+            f"😵‍💫 {model_display_name} 正在晕头转向地画，希望没画歪...",
+            f"🤕 {model_display_name} 画到一半受伤了，正在包扎（等待中）...",
+            f"🫠 {model_display_name} 正在融化的状态下画图，请耐心等待",
+            f"🫡 {model_display_name} 正在行军礼画图，画风可能比较硬核...",
+            f'🫥 {model_display_name} 正在画"不存在"的东西，请不要期待太高...',
+        ]
+        import random
+
+        message = random.choice(drawing_messages)
+        await event.send(MessageChain().message(message))
 
         # 调度提供商生成图片
         images_result, err = await self._dispatch(
