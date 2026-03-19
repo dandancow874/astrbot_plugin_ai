@@ -493,6 +493,7 @@ class BigBanana(Star):
             import_module(f"{pkg}.core.gemini")
             import_module(f"{pkg}.core.vertex_ai_anonymous")
             import_module(f"{pkg}.core.midjourney")
+            import_module(f"{pkg}.core.rh_provider")
         except Exception as e:
             logger.warning(f"_ensure_provider_registry 导入失败: {e}")
             return
@@ -504,6 +505,7 @@ class BigBanana(Star):
             import_module(f"{pkg}.core.gemini")
             import_module(f"{pkg}.core.vertex_ai_anonymous")
             import_module(f"{pkg}.core.midjourney")
+            import_module(f"{pkg}.core.rh_provider")
         except Exception:
             return
 
@@ -560,6 +562,55 @@ class BigBanana(Star):
             for part in parts:
                 tokens.extend(part.split(","))
             return [t.strip() for t in tokens if t.strip()]
+
+        def build_nano_banana_providers(
+            model_conf: dict, model_name: str
+        ) -> list[dict]:
+            """构建 nano-banana 的提供商列表，优先使用 RH 供应商"""
+            providers: list[dict] = []
+
+            # RH 供应商配置
+            rh_conf = model_conf.get("rh_provider", {})
+            if isinstance(rh_conf, dict) and rh_conf.get("enabled", False):
+                rh_key = rh_conf.get("api_key", "").strip()
+                if rh_key:
+                    rh_provider = {
+                        "name": f"nano-banana_RH",
+                        "enabled": True,
+                        "api_type": "RH_Provider",
+                        "keys": [rh_key],
+                        "api_url": "https://www.runninghub.cn",
+                        "model": model_name,
+                        "stream": False,
+                    }
+                    providers.append(rh_provider)
+
+            # grsai 主提供商配置
+            primary_conf = model_conf.get("primary", {})
+            if not isinstance(primary_conf, dict):
+                primary_conf = {}
+
+            key = primary_conf.get("api_key", model_conf.get("api_key", ""))
+            grsai_provider = {
+                "name": f"nano-banana_grsai",
+                "enabled": True,
+                "api_type": "OpenAI_Chat",
+                "keys": parse_keys(key),
+                "api_url": primary_conf.get("api_url", "https://grsai.dakka.com.cn"),
+                "model": model_name,
+                "stream": False,
+            }
+
+            # TLS 和 impersonate 配置
+            tls_verify = primary_conf.get("tls_verify", None)
+            if isinstance(tls_verify, bool):
+                grsai_provider["tls_verify"] = tls_verify
+            impersonate = primary_conf.get("impersonate", None)
+            if isinstance(impersonate, str) and impersonate.strip():
+                grsai_provider["impersonate"] = impersonate.strip()
+
+            providers.append(grsai_provider)
+            return providers
 
         def upsert_fixed_model(
             conf_key: str,
@@ -704,41 +755,13 @@ class BigBanana(Star):
                         cleaned.append(item)
                 providers = cleaned
 
-                grsai_items: list[dict] = []
-                other_items: list[dict] = []
-                for item in providers:
-                    api_url = str(item.get("api_url", "") or "").strip()
-                    lowered = api_url.lower()
-                    is_grsai = "grsai" in lowered or "dakka.com.cn" in lowered
-                    if is_grsai:
-                        item.setdefault("enabled", True)
-                        item["api_type"] = "OpenAI_Chat"
-                        if not str(item.get("model", "") or "").strip():
-                            item["model"] = "nano-banana-pro"
-                        grsai_items.append(item)
-                    else:
-                        other_items.append(item)
-
-                if not grsai_items:
-                    key = primary_conf.get("api_key", model_conf.get("api_key", ""))
-                    injected = {
-                        "name": f"{default_provider_stub.get('name', name)}_主",
-                        "enabled": True,
-                        "api_type": "OpenAI_Chat",
-                        "keys": parse_keys(key),
-                        "api_url": "https://grsai.dakka.com.cn",
-                        "model": "nano-banana-pro",
-                        "stream": False,
-                    }
-                    tls_verify = primary_conf.get("tls_verify", None)
-                    if isinstance(tls_verify, bool):
-                        injected["tls_verify"] = tls_verify
-                    impersonate = primary_conf.get("impersonate", None)
-                    if isinstance(impersonate, str) and impersonate.strip():
-                        injected["impersonate"] = impersonate.strip()
-                    grsai_items.append(injected)
-
-                providers = grsai_items + other_items
+                # 对于 nano-banana 配置，使用新的构建函数
+                if name == "nano-banana-2":
+                    providers = build_nano_banana_providers(model_conf, "nano-banana-2")
+                elif name == "nano-banana":
+                    providers = build_nano_banana_providers(
+                        model_conf, "nano-banana-pro"
+                    )
 
             triggers = default_triggers
 
@@ -770,36 +793,68 @@ class BigBanana(Star):
                 target.update(new_data)
                 updated_models = True
 
-        upsert_fixed_model(
-            conf_key="nano-banana-2_config",
-            name="nano-banana-2",
-            default_triggers=["bt2", "bt1", "bt3"],
-            default_provider_stub={
-                "name": "nano-banana-2账号",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "https://grsai.dakka.com.cn",
-                "model": "nano-banana-2",
-                "stream": False,
-            },
-            insert_index=0,
+        # nano-banana-2 模型 (bt1, bt2, bt3)
+        nanobanana_conf = self.conf.get("nanobanana_config", {})
+        if not isinstance(nanobanana_conf, dict):
+            nanobanana_conf = {}
+        nanobanana_enabled = bool(nanobanana_conf.get("enabled", True))
+
+        # 插入 nano-banana-2
+        nano_2_providers = build_nano_banana_providers(nanobanana_conf, "nano-banana-2")
+        nano_2_data = {
+            "name": "nano-banana-2",
+            "triggers": ["bt2", "bt1", "bt3"],
+            "providers": nano_2_providers,
+            "enabled": nanobanana_enabled,
+        }
+        target_2 = next(
+            (
+                m
+                for m in models_data
+                if isinstance(m, dict) and m.get("name") == "nano-banana-2"
+            ),
+            None,
         )
-        upsert_fixed_model(
-            conf_key="nanobanana_config",
-            name="nano-banana",
-            default_triggers=["bp2", "bp1", "bp3"],
-            default_provider_stub={
-                "name": "nano-banana账号",
-                "enabled": True,
-                "api_type": "OpenAI_Chat",
-                "keys": [],
-                "api_url": "https://grsai.dakka.com.cn",
-                "model": "nano-banana-pro",
-                "stream": False,
-            },
-            insert_index=1,
+        if target_2 is None:
+            models_data.insert(0, nano_2_data)
+            updated_models = True
+        elif (
+            target_2.get("triggers") != nano_2_data["triggers"]
+            or target_2.get("providers") != nano_2_data["providers"]
+            or target_2.get("enabled", True) != nano_2_data["enabled"]
+        ):
+            target_2.update(nano_2_data)
+            updated_models = True
+
+        # 插入 nano-banana (pro)
+        nano_pro_providers = build_nano_banana_providers(
+            nanobanana_conf, "nano-banana-pro"
         )
+        nano_pro_data = {
+            "name": "nano-banana",
+            "triggers": ["bp2", "bp1", "bp3"],
+            "providers": nano_pro_providers,
+            "enabled": nanobanana_enabled,
+        }
+        target_pro = next(
+            (
+                m
+                for m in models_data
+                if isinstance(m, dict) and m.get("name") == "nano-banana"
+            ),
+            None,
+        )
+        if target_pro is None:
+            models_data.insert(1, nano_pro_data)
+            updated_models = True
+        elif (
+            target_pro.get("triggers") != nano_pro_data["triggers"]
+            or target_pro.get("providers") != nano_pro_data["providers"]
+            or target_pro.get("enabled", True) != nano_pro_data["enabled"]
+        ):
+            target_pro.update(nano_pro_data)
+            updated_models = True
+
         upsert_fixed_model(
             conf_key="zimage_config",
             name="Z-Image-Turbo",

@@ -8,7 +8,10 @@ DEF_GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 DEF_VERTEX_AI_ANONYMOUS_BASE_API = "https://cloudconsole-pa.clients6.google.com"
 
 # 类型枚举
-_API_Type = Literal["Gemini", "OpenAI_Chat", "OpenAI_Images", "Vertex_AI_Anonymous"]
+_API_Type = Literal[
+    "Gemini", "OpenAI_Chat", "OpenAI_Images", "Vertex_AI_Anonymous", "RH_Provider"
+]
+
 
 @dataclass(repr=False, slots=True)
 class ProviderConfig:
@@ -37,6 +40,7 @@ class ProviderConfig:
 @dataclass(repr=False, slots=True)
 class ModelConfig:
     """模型配置，包含一组提供商和触发词"""
+
     name: str
     """模型名称"""
     triggers: list[str]

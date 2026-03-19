@@ -6,6 +6,7 @@ from .openai_chat import OpenAIChatProvider
 from .vertex_ai_anonymous import VertexAIAnonymousProvider
 from .zimg import ZImageProvider
 from .midjourney import MidjourneyProvider
+from .rh_provider import RHProvider
 
 __all__ = [
     "HttpManager",
@@ -16,4 +17,5 @@ __all__ = [
     "VertexAIAnonymousProvider",
     "ZImageProvider",
     "MidjourneyProvider",
+    "RHProvider",
 ]
