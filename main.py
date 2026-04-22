@@ -940,7 +940,7 @@ class BigBanana(Star):
                 "api_type": "Grsai_GPT_Image",
                 "keys": [],
                 "api_url": "https://api.grsai.com",
-                "model": "gpt-image-2.1",
+                "model": "gpt-image-2",
                 "stream": False,
             },
             insert_index=7,
