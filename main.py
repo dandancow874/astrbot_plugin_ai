@@ -15,14 +15,14 @@ from astrbot.core.utils.session_waiter import SessionController, session_waiter
 
 from .core import BaseProvider, Downloader, HttpManager
 from .core.data import (
-    CommonConfig,
     DEF_GEMINI_API_URL,
     DEF_OPENAI_API_URL,
     DEF_OPENAI_IMAGES_API_URL,
+    CommonConfig,
+    ModelConfig,
     PreferenceConfig,
     PromptConfig,
     ProviderConfig,
-    ModelConfig,
 )
 from .core.llm_tools import BigBananaPromptTool, BigBananaTool, remove_tools
 from .core.utils import clear_cache, read_file, save_images
@@ -932,7 +932,7 @@ class BigBanana(Star):
         )
         upsert_fixed_model(
             conf_key="gpt_image_config",
-            name="GPT-Image-2.1",
+            name="GPT-Image-2",
             default_triggers=["gpt1", "gpt2"],
             default_provider_stub={
                 "name": "GPT Image账号",
