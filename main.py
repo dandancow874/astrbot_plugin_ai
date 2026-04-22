@@ -930,6 +930,21 @@ class BigBanana(Star):
             },
             insert_index=6,
         )
+        upsert_fixed_model(
+            conf_key="gpt_image_config",
+            name="GPT-Image-2.1",
+            default_triggers=["gpt1", "gpt2"],
+            default_provider_stub={
+                "name": "GPT Image账号",
+                "enabled": True,
+                "api_type": "Grsai_GPT_Image",
+                "keys": [],
+                "api_url": "https://api.grsai.com",
+                "model": "gpt-image-2.1",
+                "stream": False,
+            },
+            insert_index=7,
+        )
 
         if updated_models:
             self.conf["models"] = models_data
@@ -1002,6 +1017,8 @@ class BigBanana(Star):
         fixed_prompts: dict[str, str] = {
             "gp1": "gp1 {{user_text}} --min_images 0 --model grok-imagine-1.0 --aspect_ratio 2:3 --n 2",
             "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit --aspect_ratio 2:3 --n 2",
+            "gpt1": "gpt1 {{user_text}} --min_images 0",
+            "gpt2": "gpt2 {{user_text}} --min_images 1",
         }
         updated_prompts = False
         for trigger, prompt_line in fixed_prompts.items():
@@ -2255,7 +2272,7 @@ class BigBanana(Star):
                 # 只有图生图模式才添加At头像作为参考图
                 # is_i2i_mode 需要在循环之前计算
                 trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
-                if trigger_cmd in {"bp2", "edit", "bt2", "mj2", "nj2"}:
+                if trigger_cmd in {"bp2", "edit", "bt2", "mj2", "nj2", "gpt2"}:
                     image_urls.append(f"https://q.qlogo.cn/g?b=qq&s=0&nk={comp.qq}")
             elif isinstance(comp, Comp.Image) and comp.url:
                 image_urls.append(comp.url)
@@ -2286,7 +2303,7 @@ class BigBanana(Star):
                         )
 
         trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
-        is_i2i_mode = trigger_cmd in {"bp2", "edit", "bt2", "mj2", "nj2"}
+        is_i2i_mode = trigger_cmd in {"bp2", "edit", "bt2", "mj2", "nj2", "gpt2"}
         if (
             is_i2i_mode
             and not image_urls
