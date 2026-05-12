@@ -1,6 +1,9 @@
 import json
 import asyncio
 import time
+import base64
+import math
+from io import BytesIO
 
 from curl_cffi.requests.exceptions import Timeout
 
@@ -14,6 +17,21 @@ class GrsaiGPTImageProvider(BaseProvider):
     """Grsai GPT Image 提供商"""
 
     api_type: str = "Grsai_GPT_Image"
+
+    SUPPORTED_RATIOS: tuple[tuple[str, float], ...] = (
+        ("9:16", 9 / 16),
+        ("2:3", 2 / 3),
+        ("3:4", 3 / 4),
+        ("1:1", 1),
+        ("3:2", 3 / 2),
+        ("8:5", 8 / 5),
+        ("5:3", 5 / 3),
+        ("16:9", 16 / 9),
+        ("2:1", 2),
+        ("2.44:1", 2.44),
+        ("3:1", 3),
+        ("4:1", 4),
+    )
 
     @staticmethod
     def _resolve_draw_url(api_url: str) -> str:
@@ -67,6 +85,70 @@ class GrsaiGPTImageProvider(BaseProvider):
             return failure.strip()
         return None
 
+    @staticmethod
+    def _normalize_ratio(value: str) -> str:
+        return (
+            value.strip("`'\" \t\r\n,，;；。.!！?？)）]】}、")
+            .replace("：", ":")
+            .replace("／", ":")
+            .replace("/", ":")
+            .replace("\\", ":")
+        )
+
+    @classmethod
+    def _nearest_supported_ratio(cls, width: int, height: int) -> str | None:
+        if width <= 0 or height <= 0:
+            return None
+        actual = width / height
+        # 相对误差比绝对误差更适合比较横图、竖图和超宽比例。
+        return min(
+            cls.SUPPORTED_RATIOS,
+            key=lambda item: abs(math.log(actual / item[1])),
+        )[0]
+
+    @staticmethod
+    def _infer_b64_dimensions(b64: str) -> tuple[int, int] | None:
+        if not isinstance(b64, str) or not b64.strip():
+            return None
+        try:
+            raw = base64.b64decode(b64, validate=False)
+        except Exception:
+            return None
+        try:
+            from PIL import Image
+
+            with Image.open(BytesIO(raw)) as img:
+                width, height = img.size
+        except Exception:
+            return None
+        if width > 0 and height > 0:
+            return width, height
+        return None
+
+    @classmethod
+    def _resolve_payload_size(
+        cls,
+        aspect_ratio: object,
+        image_b64_list: list[tuple[str, str]],
+    ) -> str:
+        if isinstance(aspect_ratio, str) and aspect_ratio.strip():
+            ar = cls._normalize_ratio(aspect_ratio)
+            if ar.lower() == "default":
+                return "1:1"
+            if ar.lower() == "auto":
+                for _, b64 in image_b64_list:
+                    dim = cls._infer_b64_dimensions(b64)
+                    if dim:
+                        resolved = cls._nearest_supported_ratio(dim[0], dim[1])
+                        if resolved:
+                            logger.info(
+                                f"[GPT Image] auto size: source={dim[0]}x{dim[1]} -> {resolved}"
+                            )
+                            return resolved
+                return "1:1"
+            return ar
+        return "1:1"
+
     async def _call_api(
         self,
         provider_config: ProviderConfig,
@@ -88,23 +170,12 @@ class GrsaiGPTImageProvider(BaseProvider):
         payload: dict = {
             "model": model,
             "prompt": prompt,
-            "size": "1:1",
+            "size": self._resolve_payload_size(
+                params.get("aspect_ratio"), image_b64_list
+            ),
         }
         if urls:
             payload["urls"] = urls
-
-        aspect_ratio = params.get("aspect_ratio")
-        if isinstance(aspect_ratio, str) and aspect_ratio.strip():
-            ar = aspect_ratio.strip()
-            if ar and ar.lower() != "default":
-                size_map = {
-                    "1:1": "1:1",
-                    "3:2": "3:2",
-                    "2:3": "2:3",
-                    "16:9": "16:9",
-                    "9:16": "9:16",
-                }
-                payload["size"] = size_map.get(ar, ar)
 
         draw_url = self._resolve_draw_url(provider_config.api_url)
         try:

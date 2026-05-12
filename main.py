@@ -1017,8 +1017,8 @@ class BigBanana(Star):
         fixed_prompts: dict[str, str] = {
             "gp1": "gp1 {{user_text}} --min_images 0 --model grok-imagine-1.0 --aspect_ratio 2:3 --n 2",
             "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit --aspect_ratio 2:3 --n 2",
-            "gpt1": "gpt1 {{user_text}} --min_images 0",
-            "gpt2": "gpt2 {{user_text}} --min_images 1",
+            "gpt1": "gpt1 {{user_text}} --min_images 0 --aspect_ratio 9:16",
+            "gpt2": "gpt2 {{user_text}} --min_images 1 --aspect_ratio auto",
         }
         updated_prompts = False
         for trigger, prompt_line in fixed_prompts.items():
