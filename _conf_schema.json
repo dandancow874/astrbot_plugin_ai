@@ -566,6 +566,12 @@
         "type": "object",
         "hint": "默认情况下，@机器人 将无视前缀要求（相当于启用混合模式）",
         "items": {
+            "require_at_in_group": {
+                "description": "群聊必须@机器人",
+                "type": "bool",
+                "default": false,
+                "hint": "启用后，群聊中只有@机器人唤醒的绘图命令才会触发；普通前缀或直接发送触发词不会触发。私聊不受影响。"
+            },
             "coexist_enabled": {
                 "description": "混合模式",
                 "type": "bool",

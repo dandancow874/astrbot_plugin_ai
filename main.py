@@ -437,6 +437,7 @@ class BigBanana(Star):
         prefix_config = self.conf.get("prefix_config", {})
         self.coexist_enabled = prefix_config.get("coexist_enabled", False)
         self.prefix_list = prefix_config.get("prefix_list", [])
+        self.require_at_in_group = bool(prefix_config.get("require_at_in_group", False))
 
         # 数据目录
         data_dir = StarTools.get_data_dir("astrbot_plugin_big_banana")
@@ -483,6 +484,42 @@ class BigBanana(Star):
             logger.info("已注册函数调用工具: banana_image_generation")
             self.context.add_llm_tools(BigBananaPromptTool(plugin=self))
             logger.info("已注册函数调用工具: banana_preset_prompt")
+
+    @staticmethod
+    def _is_group_event(event: AstrMessageEvent) -> bool:
+        """兼容不同 AstrBot 版本和平台的群聊事件判断。"""
+        message_obj = getattr(event, "message_obj", None)
+        for source in (message_obj, event):
+            if source is None:
+                continue
+            for attr in ("type", "message_type"):
+                value = getattr(source, attr, None)
+                if isinstance(value, str) and value.lower() in {
+                    "group",
+                    "groupmessage",
+                    "group_message",
+                }:
+                    return True
+
+        origin = getattr(event, "unified_msg_origin", "")
+        if isinstance(origin, str):
+            lowered = origin.lower()
+            return "group" in lowered or "guild" in lowered or "channel" in lowered
+        return False
+
+    @staticmethod
+    def _is_at_self_event(event: AstrMessageEvent) -> bool:
+        self_id = str(event.get_self_id() or "")
+        saw_at_component = False
+        for comp in event.get_messages():
+            if not isinstance(comp, Comp.At):
+                continue
+            saw_at_component = True
+            if self_id and str(comp.qq) == self_id:
+                return True
+        if saw_at_component:
+            return False
+        return bool(event.is_at_or_wake_command)
 
     def _ensure_provider_registry(self) -> None:
         try:
@@ -1891,6 +1928,13 @@ class BigBanana(Star):
             and not self.coexist_enabled
             and self.prefix_list
             and not matched_prefix
+        ):
+            return
+
+        if (
+            self.require_at_in_group
+            and self._is_group_event(event)
+            and not self._is_at_self_event(event)
         ):
             return
 
