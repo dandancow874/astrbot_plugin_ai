@@ -581,6 +581,39 @@ class BigBanana(Star):
         self.conf.save_config()
         self._export_prompt_presets_txt()
 
+    def _resolve_model_display_name(
+        self, params: dict, sender_id: str | None = None
+    ) -> str:
+        candidates: list[object] = [
+            params.get("__model_name__"),
+            params.get("model"),
+        ]
+        if sender_id:
+            candidates.append(self.user_selected_provider_model.get(sender_id))
+
+        common_config = self.conf.get("common_config", {})
+        if isinstance(common_config, dict):
+            candidates.append(common_config.get("default_provider_model"))
+
+        if not getattr(self, "models", None):
+            self.init_providers()
+            self.init_prompts()
+        for model in getattr(self, "models", []) or []:
+            if not model.enabled:
+                continue
+            candidates.append(model.name)
+            for provider in model.providers:
+                if provider.enabled and str(provider.model or "").strip():
+                    candidates.append(provider.model)
+                    break
+            break
+
+        for candidate in candidates:
+            text = str(candidate or "").strip()
+            if text:
+                return text.replace("-", " ")
+        return "默认模型"
+
     @staticmethod
     def _is_group_event(event: AstrMessageEvent) -> bool:
         """兼容不同 AstrBot 版本和平台的群聊事件判断。"""
@@ -2541,7 +2574,9 @@ class BigBanana(Star):
                 return None, "全部参考图片下载失败"
 
         # 发送绘图中提示
-        model_display_name = params.get("__model_name__", "神秘画师").replace("-", " ")
+        model_display_name = self._resolve_model_display_name(
+            params, event.get_sender_id()
+        )
         drawing_messages = [
             f"🎨 {model_display_name} 正在疯狂运转显卡，别催，再催显卡冒烟了！",
             f"🎭 {model_display_name} 正在憋大招呢，艺术创作急不得！",
