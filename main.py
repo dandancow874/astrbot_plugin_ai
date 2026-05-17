@@ -1297,12 +1297,15 @@ class BigBanana(Star):
                 break
             if token.startswith("--"):
                 key = token[2:]
+                inline_value = None
+                if "=" in key:
+                    key, inline_value = key.split("=", 1)
                 # 处理参数别称映射
                 if key in PARAMS_ALIAS_MAP:
                     key = PARAMS_ALIAS_MAP[key]
                 # 仅处理已知参数
                 if key in PARAMS_LIST:
-                    value = next(tokens_iter, None)
+                    value = inline_value if inline_value is not None else next(tokens_iter, None)
                     if value is None:
                         params[key] = True
                         break

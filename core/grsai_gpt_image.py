@@ -138,7 +138,7 @@ class GrsaiGPTImageProvider(BaseProvider):
         if isinstance(aspect_ratio, str) and aspect_ratio.strip():
             ar = cls._normalize_ratio(aspect_ratio)
             if ar.lower() == "default":
-                return "1:1"
+                return "1:1" if image_b64_list else "9:16"
             if ar.lower() == "auto":
                 for _, b64 in image_b64_list:
                     dim = cls._infer_b64_dimensions(b64)
@@ -149,9 +149,9 @@ class GrsaiGPTImageProvider(BaseProvider):
                                 f"[GPT Image] auto size: source={dim[0]}x{dim[1]} -> {resolved}"
                             )
                             return resolved
-                return "1:1"
+                return "1:1" if image_b64_list else "9:16"
             return ar
-        return "1:1"
+        return "1:1" if image_b64_list else "9:16"
 
     async def _call_api(
         self,
@@ -178,6 +178,9 @@ class GrsaiGPTImageProvider(BaseProvider):
                 params.get("aspect_ratio"), image_b64_list
             ),
         }
+        logger.info(
+            f"[GPT Image] request size={payload['size']}, aspect_ratio={params.get('aspect_ratio')}"
+        )
         if urls:
             payload["urls"] = urls
 
