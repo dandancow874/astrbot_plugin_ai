@@ -76,6 +76,8 @@ class PromptConfig:
 class CommonConfig:
     """常规配置参数"""
 
+    default_provider_model: str = ""
+    """默认生图 provider model 名称"""
     preset_append: bool = False
     """ 是否在预设提示词后追加用户输入文本 """
     text_response: bool = False
