@@ -5,6 +5,10 @@ import base64
 import math
 from io import BytesIO
 
+try:
+    from curl_cffi import CurlHttpVersion
+except Exception:
+    CurlHttpVersion = None
 from curl_cffi.requests.exceptions import Timeout
 
 from astrbot.api import logger
@@ -197,6 +201,8 @@ class GrsaiGPTImageProvider(BaseProvider):
             }
             if impersonate:
                 req_kwargs["impersonate"] = impersonate
+            if CurlHttpVersion is not None:
+                req_kwargs["http_version"] = CurlHttpVersion.V1_1
 
             response = await self.session.post(
                 url=draw_url,
@@ -301,8 +307,16 @@ class GrsaiGPTImageProvider(BaseProvider):
             logger.error(f"[GPT Image] 网络请求超时: {e}")
             return None, 408, "图片生成失败：响应超时"
         except Exception as e:
-            logger.error(f"[GPT Image] 请求错误: {e}, url={draw_url}")
-            return None, None, "图片生成失败：程序错误"
+            err_text = str(e)
+            logger.error(f"[GPT Image] 请求错误: {err_text}, url={draw_url}")
+            if (
+                "curl: (35)" in err_text
+                or "connection reset" in err_text.lower()
+                or "recv failure" in err_text.lower()
+                or "tls connect error" in err_text.lower()
+            ):
+                return None, 503, "图片生成失败：上游连接被重置，请稍后重试"
+            return None, 500, f"图片生成失败：请求错误: {err_text}"
 
     async def _poll_result(
         self,

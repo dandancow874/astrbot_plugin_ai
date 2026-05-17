@@ -440,11 +440,11 @@ class BigBanana(Star):
         self.require_at_in_group = bool(prefix_config.get("require_at_in_group", False))
 
         # 数据目录
-        data_dir = StarTools.get_data_dir("astrbot_plugin_big_banana")
-        self.refer_images_dir = data_dir / "refer_images"
-        self.save_dir = data_dir / "save_images"
+        self.data_dir = StarTools.get_data_dir("astrbot_plugin_big_banana")
+        self.refer_images_dir = self.data_dir / "refer_images"
+        self.save_dir = self.data_dir / "save_images"
         # 临时文件目录
-        self.temp_dir = data_dir / "temp_images"
+        self.temp_dir = self.data_dir / "temp_images"
 
         # 图片持久化
         save_images_config = self.conf.get("save_images", {})
@@ -462,6 +462,7 @@ class BigBanana(Star):
         os.makedirs(self.temp_dir, exist_ok=True)
         if self.save_images:
             os.makedirs(self.save_dir, exist_ok=True)
+        self._export_prompt_presets_txt()
 
         # 实例化类
         self.preference_config = PreferenceConfig(
@@ -484,6 +485,101 @@ class BigBanana(Star):
             logger.info("已注册函数调用工具: banana_image_generation")
             self.context.add_llm_tools(BigBananaPromptTool(plugin=self))
             logger.info("已注册函数调用工具: banana_preset_prompt")
+
+    def _export_prompt_presets_txt(self):
+        try:
+            data_dir = getattr(
+                self, "data_dir", StarTools.get_data_dir("astrbot_plugin_big_banana")
+            )
+            os.makedirs(data_dir, exist_ok=True)
+            path = data_dir / "prompt_presets.txt"
+            prompt_list = getattr(self, "prompt_list", None)
+            if not isinstance(prompt_list, list):
+                prompt_list = self.conf.get("prompt", [])
+            lines = [
+                str(item).rstrip()
+                for item in prompt_list
+                if isinstance(item, str) and item.strip()
+            ]
+            content = "\n".join(lines)
+            if content:
+                content += "\n"
+            path.write_text(content, encoding="utf-8")
+            self._export_prompt_preset_files(data_dir, lines)
+            return path
+        except Exception as e:
+            logger.warning(f"导出预设提示词 txt 失败: {e}")
+            return None
+
+    @staticmethod
+    def _safe_preset_filename(name: str) -> str:
+        safe = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(name).strip())
+        safe = safe.strip(" ._")
+        if not safe:
+            safe = "preset"
+        return safe[:80]
+
+    def _export_prompt_preset_files(self, data_dir, lines: list[str]) -> None:
+        export_dir = data_dir / "prompt_presets"
+        manifest_path = export_dir / ".generated_files.json"
+        os.makedirs(export_dir, exist_ok=True)
+
+        previous: list[str] = []
+        if manifest_path.exists():
+            try:
+                loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, list):
+                    previous = [str(item) for item in loaded if isinstance(item, str)]
+            except Exception:
+                previous = []
+
+        current: set[str] = set()
+        used_names: set[str] = set()
+        for line in lines:
+            cmd_raw, _, prompt_text = line.partition(" ")
+            trigger_names = [cmd_raw.strip()]
+            if cmd_raw.startswith("[") and cmd_raw.endswith("]"):
+                trigger_names = [
+                    item.strip()
+                    for item in cmd_raw[1:-1].split(",")
+                    if item.strip()
+                ]
+
+            for trigger in trigger_names:
+                base_name = self._safe_preset_filename(trigger)
+                filename = f"{base_name}.txt"
+                suffix = 2
+                while filename.lower() in used_names:
+                    filename = f"{base_name}_{suffix}.txt"
+                    suffix += 1
+                used_names.add(filename.lower())
+                current.add(filename)
+
+                file_content = (
+                    f"trigger: {trigger}\n"
+                    f"prompt: {prompt_text.strip()}\n"
+                    f"raw: {line}\n"
+                )
+                (export_dir / filename).write_text(file_content, encoding="utf-8")
+
+        for filename in previous:
+            if filename not in current:
+                stale_path = export_dir / filename
+                try:
+                    if stale_path.is_file():
+                        stale_path.unlink()
+                except Exception as e:
+                    logger.warning(f"删除旧预设 txt 失败: {stale_path}, {e}")
+
+        manifest_path.write_text(
+            json.dumps(sorted(current), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def _save_prompt_config_and_backup(self) -> None:
+        self.conf["prompt"] = self.prompt_list
+        self.conf.save_config()
+        self._export_prompt_presets_txt()
 
     @staticmethod
     def _is_group_event(event: AstrMessageEvent) -> bool:
@@ -1122,8 +1218,7 @@ class BigBanana(Star):
                             self.prompt_dict[trigger]["__model_name__"] = model.name
 
         if updated_prompts:
-            self.conf["prompt"] = self.prompt_list
-            self.conf.save_config()
+            self._save_prompt_config_and_backup()
 
     def parsing_prompt_params(self, prompt: str) -> tuple[list[str], dict]:
         """解析提示词中的参数，若没有指定参数则使用默认值填充。必须是包括命令和参数的完整提示词"""
@@ -1636,7 +1731,7 @@ class BigBanana(Star):
             else:
                 self.prompt_list.append(build_prompt)
 
-            self.conf.save_config()
+            self._save_prompt_config_and_backup()
             self.init_prompts()
             await event.send(
                 event.plain_result(f"✅ 已成功{action}提示词：「{trigger_word}」")
@@ -1725,7 +1820,7 @@ class BigBanana(Star):
                 else:
                     self.prompt_list.append(build_prompt)
 
-                self.conf.save_config()
+                self._save_prompt_config_and_backup()
                 self.init_prompts()
                 await event.send(
                     event.plain_result(f"✅ 已成功{action}提示词：「{trigger_word}」")
@@ -1768,7 +1863,7 @@ class BigBanana(Star):
         else:
             self.prompt_list.append(build_prompt)
 
-        self.conf.save_config()
+        self._save_prompt_config_and_backup()
         self.init_prompts()
         yield event.plain_result(f"✅ 已成功{action}提示词：「{trigger_word}」")
 
@@ -1841,7 +1936,7 @@ class BigBanana(Star):
             if cmd == trigger_word:
                 del self.prompt_list[i]
                 self.init_prompts()
-                self.conf.save_config()
+                self._save_prompt_config_and_backup()
                 yield event.plain_result(f"🗑️ 已删除提示词：「{trigger_word}」")
                 return
             # 处理多触发词
@@ -1885,7 +1980,7 @@ class BigBanana(Star):
                         await event.send(
                             event.plain_result(f"🗑️ 已删除多触发提示词：{cmd}")
                         )
-                        self.conf.save_config()
+                        self._save_prompt_config_and_backup()
                         controller.stop()
                         return
                     if reply_content == "A":
@@ -1908,7 +2003,7 @@ class BigBanana(Star):
                                 f"🗑️ 已从多触发提示词中移除：「{trigger_word}」"
                             )
                         )
-                        self.conf.save_config()
+                        self._save_prompt_config_and_backup()
                         controller.stop()
                         return
 
