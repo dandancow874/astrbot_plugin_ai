@@ -492,7 +492,7 @@ class BigBanana(Star):
                 self, "data_dir", StarTools.get_data_dir("astrbot_plugin_big_banana")
             )
             os.makedirs(data_dir, exist_ok=True)
-            path = data_dir / "prompt_presets.txt"
+            path = data_dir / "prompt_presets.md"
             prompt_list = getattr(self, "prompt_list", None)
             if not isinstance(prompt_list, list):
                 prompt_list = self.conf.get("prompt", [])
@@ -501,10 +501,13 @@ class BigBanana(Star):
                 for item in prompt_list
                 if isinstance(item, str) and item.strip()
             ]
-            content = "\n".join(lines)
-            if content:
-                content += "\n"
+            content = "# Prompt Presets\n\n"
+            if lines:
+                content += "```text\n" + "\n".join(lines) + "\n```\n"
             path.write_text(content, encoding="utf-8")
+            legacy_txt = data_dir / "prompt_presets.txt"
+            if legacy_txt.is_file():
+                legacy_txt.unlink()
             self._export_prompt_preset_files(data_dir, lines)
             return path
         except Exception as e:
@@ -547,18 +550,20 @@ class BigBanana(Star):
 
             for trigger in trigger_names:
                 base_name = self._safe_preset_filename(trigger)
-                filename = f"{base_name}.txt"
+                filename = f"{base_name}.md"
                 suffix = 2
                 while filename.lower() in used_names:
-                    filename = f"{base_name}_{suffix}.txt"
+                    filename = f"{base_name}_{suffix}.md"
                     suffix += 1
                 used_names.add(filename.lower())
                 current.add(filename)
 
                 file_content = (
-                    f"trigger: {trigger}\n"
-                    f"prompt: {prompt_text.strip()}\n"
-                    f"raw: {line}\n"
+                    f"# {trigger}\n\n"
+                    f"## Prompt\n\n"
+                    f"{prompt_text.strip()}\n\n"
+                    f"## Raw\n\n"
+                    f"```text\n{line}\n```\n"
                 )
                 (export_dir / filename).write_text(file_content, encoding="utf-8")
 
@@ -569,7 +574,17 @@ class BigBanana(Star):
                     if stale_path.is_file():
                         stale_path.unlink()
                 except Exception as e:
-                    logger.warning(f"删除旧预设 txt 失败: {stale_path}, {e}")
+                    logger.warning(f"删除旧预设文件失败: {stale_path}, {e}")
+                if filename.lower().endswith(".txt"):
+                    legacy_md_name = filename[:-4] + ".md"
+                    if legacy_md_name in current:
+                        continue
+                    legacy_path = export_dir / legacy_md_name
+                    try:
+                        if legacy_path.is_file():
+                            legacy_path.unlink()
+                    except Exception as e:
+                        logger.warning(f"删除旧预设文件失败: {legacy_path}, {e}")
 
         manifest_path.write_text(
             json.dumps(sorted(current), ensure_ascii=False, indent=2),
