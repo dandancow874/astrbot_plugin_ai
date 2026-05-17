@@ -523,6 +523,12 @@
         "type": "object",
         "hint": "",
         "items": {
+            "default_provider_model": {
+                "description": "默认生图模型",
+                "type": "string",
+                "default": "",
+                "hint": "直接输入要作为默认的 provider model 名称，例如 gpt-image-2、nano-banana-pro、grok-imagine-1.0。留空则使用模型列表中的第一个启用模型。"
+            },
             "preset_append": {
                 "description": "启用预设提示词补充",
                 "type": "bool",

@@ -1222,9 +1222,39 @@ class BigBanana(Star):
             m = re.search(r"([123])", token)
             key = m.group(1) if m else ""
         chosen = model_map.get(key)
+
+        available: dict[str, str] = {}
+        if not getattr(self, "models", None):
+            self.init_providers()
+            self.init_prompts()
+        for model in getattr(self, "models", []) or []:
+            if not model.enabled:
+                continue
+            first_provider_model = ""
+            for provider in model.providers:
+                if not provider.enabled:
+                    continue
+                provider_model = str(provider.model or "").strip()
+                if not provider_model:
+                    continue
+                first_provider_model = first_provider_model or provider_model
+                available[provider_model.lower()] = provider_model
+                available[str(provider.name or "").strip().lower()] = provider_model
+            if first_provider_model:
+                available[str(model.name or "").strip().lower()] = first_provider_model
+
+        if not chosen and token:
+            chosen = available.get(token.lower())
+
         if not chosen:
+            available_models = sorted(set(available.values()))
+            available_text = "\n可用模型名：" + "、".join(available_models) if available_models else ""
             yield event.plain_result(
-                "❌ 用法：使用模型切换 <1/2/3>\n1：gemini-3.0-pro-image-portrait\n2：gemini-3.0-pro-image-landscape\n3：nano-banana-pro"
+                "❌ 用法：模型切换 <编号或模型名>\n"
+                "1：gemini-3.0-pro-image-portrait\n"
+                "2：gemini-3.0-pro-image-landscape\n"
+                "3：nano-banana-pro"
+                f"{available_text}"
             )
             return
 
@@ -1233,7 +1263,8 @@ class BigBanana(Star):
             self.user_selected_provider_model
         )
         self.conf.save_config()
-        yield event.plain_result(f"✅ 已切换模型：{key}（{chosen}）")
+        label = key if key in model_map else token
+        yield event.plain_result(f"✅ 已切换模型：{label}（{chosen}）")
 
     # === 管理指令：白名单管理 ===
     @filter.command("lm白名单添加", alias={"lmawl"})
@@ -2687,14 +2718,21 @@ class BigBanana(Star):
                         target_model = model
                         break
             if not target_model:
-                preferred_provider_model = "gemini-3.0-pro-image-portrait"
-                for model in self.models:
-                    if any(
-                        (p.model or "").strip() == preferred_provider_model
-                        for p in model.providers
-                    ):
-                        target_model = model
-                        break
+                common_config = self.conf.get("common_config", {})
+                preferred_provider_model = (
+                    common_config.get("default_provider_model", "")
+                    if isinstance(common_config, dict)
+                    else ""
+                )
+                preferred_provider_model = str(preferred_provider_model or "").strip()
+                if preferred_provider_model:
+                    for model in self.models:
+                        if any(
+                            (p.model or "").strip() == preferred_provider_model
+                            for p in model.providers
+                        ):
+                            target_model = model
+                            break
             if not target_model:
                 target_model = self.models[0]
 

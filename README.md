@@ -70,6 +70,13 @@ bt1 --ps myp
 bt1 --ps myp 附加提示词
 ```
 
+预设名本身也可以作为触发词直接调用：
+
+```
+myp
+myp 附加提示词
+```
+
 #### 查看预设列表
 
 ```
@@ -81,6 +88,33 @@ lml 或 lmpl
 ```
 lmc myp 或 lmps myp
 ```
+
+### 模型切换
+
+可以在聊天窗口为当前用户切换默认使用的 provider model：
+
+```
+模型切换 gpt-image-2
+模型切换 nano-banana-pro
+模型切换 grok-imagine-1.0
+```
+
+也兼容旧的编号写法：
+
+```
+模型切换 1
+模型切换 2
+模型切换 3
+```
+
+还可以使用模型方案名切换，例如：
+
+```
+模型切换 GPT-Image-2
+模型切换 Grok
+```
+
+切换结果会按用户保存。没有写死模型的预设（例如直接发送 `myp`）会优先使用当前用户切换过的模型。
 
 ### 图片保存
 
@@ -129,9 +163,16 @@ lmc myp 或 lmps myp
 
 ### 常规配置
 
+- `default_provider_model` - 默认生图模型。填写 provider model 名称，例如 `gpt-image-2`、`nano-banana-pro`、`grok-imagine-1.0`；留空时使用模型列表中的第一个启用模型
 - `timeout` - 超时时间（秒）
 - `proxy` - HTTP 代理
 - `max_retry` - 最大重试次数
+
+### 群聊触发方式
+
+- `require_at_in_group` - 启用后，群聊里必须 `@机器人` 才会触发绘图命令；私聊不受影响
+- `coexist_enabled` - 混合模式，启用后无命令前缀和带命令前缀都可触发
+- `prefix_list` - 命令前缀列表
 
 ## 安装
 
