@@ -2147,6 +2147,8 @@ class BigBanana(Star):
         user_overrode_model = "model" in user_params
         user_overrode_aspect_ratio = "aspect_ratio" in user_params
         params["__user_overrode_model__"] = user_overrode_model
+        params["__user_overrode_aspect_ratio__"] = user_overrode_aspect_ratio
+        params["__user_overrode_image_size__"] = user_overrode_image_size
         preset_name = user_params.pop("preset", None)
         user_prompt = user_params.get("prompt", "anything").strip()
 
@@ -2886,6 +2888,42 @@ class BigBanana(Star):
 
         if not target_model:
             return None, "未配置任何模型。"
+
+        # 如果是通过默认模型 / 模型切换选中的模型，沿用该模型触发词的默认参数。
+        # 例如 GPT-Image-2 的 gpt1/gpt2 里定义了文生图 9:16、图生图 auto。
+        trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
+        if trigger_cmd not in set(target_model.triggers or []):
+            prefer_i2i = bool(image_b64_list)
+            selected_trigger = ""
+            for trigger in target_model.triggers or []:
+                trigger_text = str(trigger).strip()
+                if not trigger_text:
+                    continue
+                if prefer_i2i and trigger_text.endswith("2"):
+                    selected_trigger = trigger_text
+                    break
+                if not prefer_i2i and not trigger_text.endswith("2"):
+                    selected_trigger = trigger_text
+                    break
+            if not selected_trigger and target_model.triggers:
+                selected_trigger = str(target_model.triggers[0]).strip()
+
+            trigger_defaults = self.prompt_dict.get(selected_trigger, {})
+            if isinstance(trigger_defaults, dict):
+                for key, value in trigger_defaults.items():
+                    if key in {"prompt", "__model_name__"}:
+                        continue
+                    if key == "aspect_ratio" and params.get("__user_overrode_aspect_ratio__"):
+                        continue
+                    if key == "image_size" and params.get("__user_overrode_image_size__"):
+                        continue
+                    if key == "model" and params.get("__user_overrode_model__"):
+                        continue
+                    params.setdefault(key, value)
+                if selected_trigger:
+                    logger.info(
+                        f"[BIG BANANA] 默认模型沿用触发词参数: model={target_model.name}, trigger={selected_trigger}, aspect_ratio={params.get('aspect_ratio')}"
+                    )
 
         # 2. 获取该模型的提供商列表
         all_candidate_providers = target_model.providers
