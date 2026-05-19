@@ -466,6 +466,7 @@ class BigBanana(Star):
         # 正在运行的任务映射
         self.running_tasks: dict[str, asyncio.Task] = {}
         self.job_semaphore: asyncio.Semaphore | None = None
+        self.comfyui_lock: asyncio.Lock | None = None
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
@@ -486,6 +487,7 @@ class BigBanana(Star):
         curl_session = self.http_manager._get_curl_session()
         self.downloader = Downloader(curl_session, self.common_config)
         self.job_semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_JOBS)
+        self.comfyui_lock = asyncio.Lock()
 
         # 注册提供商类型实例
         self.init_providers()
@@ -1487,6 +1489,13 @@ class BigBanana(Star):
         self.conf.save_config()
         self.init_providers()
         self.init_prompts()
+
+    @staticmethod
+    def _is_comfyui_params(params: dict) -> bool:
+        return (
+            params.get("__model_name__") == "ComfyUI"
+            or params.get("__trigger_cmd__") == "cf"
+        )
 
     def parsing_prompt_params(self, prompt: str) -> tuple[list[str], dict]:
         """解析提示词中的参数，若没有指定参数则使用默认值填充。必须是包括命令和参数的完整提示词"""
@@ -3011,6 +3020,25 @@ class BigBanana(Star):
         referer_id: list[str] | None = None,
         is_llm_tool: bool = False,
     ) -> tuple[list[tuple[str, str]] | None, str | None]:
+        if self._is_comfyui_params(params):
+            lock = self.comfyui_lock
+            if lock is None:
+                return await self.job(
+                    event=event,
+                    params=params,
+                    image_urls=image_urls,
+                    referer_id=referer_id,
+                    is_llm_tool=is_llm_tool,
+                )
+            async with lock:
+                return await self.job(
+                    event=event,
+                    params=params,
+                    image_urls=image_urls,
+                    referer_id=referer_id,
+                    is_llm_tool=is_llm_tool,
+                )
+
         if self.is_global_admin(event):
             return await self.job(
                 event=event,
