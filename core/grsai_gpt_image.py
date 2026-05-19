@@ -153,6 +153,16 @@ class GrsaiGPTImageProvider(BaseProvider):
             return ar
         return "1:1" if image_b64_list else "9:16"
 
+    @staticmethod
+    def _build_data_urls(image_b64_list: list[tuple[str, str]]) -> list[str]:
+        data_urls: list[str] = []
+        for mime, b64 in image_b64_list:
+            if not b64:
+                continue
+            mime_type = (mime or "image/png").strip() or "image/png"
+            data_urls.append(f"data:{mime_type};base64,{b64}")
+        return data_urls
+
     async def _call_api(
         self,
         provider_config: ProviderConfig,
@@ -170,6 +180,7 @@ class GrsaiGPTImageProvider(BaseProvider):
         if not isinstance(urls, list):
             urls = []
         urls = [u.strip() for u in urls if isinstance(u, str) and u.strip()]
+        image_data_urls = self._build_data_urls(image_b64_list)
 
         payload: dict = {
             "model": model,
@@ -187,9 +198,11 @@ class GrsaiGPTImageProvider(BaseProvider):
         }:
             payload["quality"] = quality.strip().lower()
         logger.info(
-            f"[GPT Image] request size={payload['size']}, quality={payload.get('quality', 'auto')}, aspect_ratio={params.get('aspect_ratio')}"
+            f"[GPT Image] request size={payload['size']}, quality={payload.get('quality', 'auto')}, aspect_ratio={params.get('aspect_ratio')}, reference_images={len(image_data_urls)}"
         )
-        if urls:
+        if image_data_urls:
+            payload["urls"] = image_data_urls
+        elif urls:
             payload["urls"] = urls
 
         draw_url = self._resolve_draw_url(provider_config.api_url)

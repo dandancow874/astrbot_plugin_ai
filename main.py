@@ -1355,6 +1355,19 @@ class BigBanana(Star):
         if updated_prompts:
             self._save_prompt_config_and_backup()
 
+    def _reserved_prompt_triggers(self) -> set[str]:
+        reserved = {"gp1", "gp2", "gpt1", "gpt2"}
+        if hasattr(self, "models"):
+            for model in self.models:
+                for trigger in getattr(model, "triggers", []) or []:
+                    trigger_text = str(trigger).strip()
+                    if trigger_text:
+                        reserved.add(trigger_text)
+        return reserved
+
+    def _is_reserved_prompt_trigger(self, trigger_word: str) -> bool:
+        return str(trigger_word or "").strip() in self._reserved_prompt_triggers()
+
     def parsing_prompt_params(self, prompt: str) -> tuple[list[str], dict]:
         """解析提示词中的参数，若没有指定参数则使用默认值填充。必须是包括命令和参数的完整提示词"""
 
@@ -1817,6 +1830,12 @@ class BigBanana(Star):
             yield event.plain_result("❌ 格式错误：lm添加 (触发词)")
             return
 
+        if self._is_reserved_prompt_trigger(trigger_word):
+            yield event.plain_result(
+                f"❌「{trigger_word}」是内置模型触发词，不能作为预设添加或更新。"
+            )
+            return
+
         yield event.plain_result(
             f"🍌 正在为触发词 「{trigger_word}」 添加/更新提示词\n✦ 请在60秒内输入完整的提示词内容（不含触发词，包含参数）\n✦ 输入「取消」可取消操作。"
         )
@@ -1905,6 +1924,12 @@ class BigBanana(Star):
             else:
                 yield event.plain_result("❌ 用法：lmp <触发词> <提示词内容>")
                 return
+
+        if self._is_reserved_prompt_trigger(trigger_word):
+            yield event.plain_result(
+                f"❌「{trigger_word}」是内置模型触发词，不能作为预设添加或更新。"
+            )
+            return
 
         if raw and trigger_word in raw:
             suffix = raw.split(trigger_word, 1)[1].strip()
@@ -2016,7 +2041,8 @@ class BigBanana(Star):
             )
             return
 
-        prompts = list(self.prompt_dict.keys())
+        reserved = self._reserved_prompt_triggers()
+        prompts = [key for key in self.prompt_dict.keys() if key not in reserved]
         if not prompts:
             yield event.plain_result("当前没有预设提示词。")
             return
@@ -2064,6 +2090,12 @@ class BigBanana(Star):
 
         if not trigger_word:
             yield event.plain_result("❌ 格式错误：lm删除 (触发词)")
+            return
+
+        if self._is_reserved_prompt_trigger(trigger_word):
+            yield event.plain_result(
+                f"❌「{trigger_word}」是内置模型触发词，不能通过预设命令删除。"
+            )
             return
 
         if trigger_word not in self.prompt_dict:
