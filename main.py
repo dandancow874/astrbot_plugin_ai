@@ -1368,6 +1368,24 @@ class BigBanana(Star):
     def _is_reserved_prompt_trigger(self, trigger_word: str) -> bool:
         return str(trigger_word or "").strip() in self._reserved_prompt_triggers()
 
+    def _format_prompt_list(self) -> str:
+        reserved = self._reserved_prompt_triggers()
+        prompts = [key for key in self.prompt_dict.keys() if key not in reserved]
+        if not prompts:
+            return "当前没有预设提示词。"
+        return "📜 当前预设提示词列表：\n" + "、".join(prompts)
+
+    def _format_prompt_details(self, trigger_word: str) -> str:
+        if trigger_word not in self.prompt_dict:
+            return f"❌ 未找到提示词：「{trigger_word}」"
+        params = self.prompt_dict[trigger_word]
+        details = [f"📋 提示词详情：「{trigger_word}」"]
+        details.append(params.get("prompt", ""))
+        for key in PARAMS_LIST:
+            if key in params:
+                details.append(f"{key}: {params[key]}")
+        return "\n".join(details)
+
     def parsing_prompt_params(self, prompt: str) -> tuple[list[str], dict]:
         """解析提示词中的参数，若没有指定参数则使用默认值填充。必须是包括命令和参数的完整提示词"""
 
@@ -2035,14 +2053,7 @@ class BigBanana(Star):
     @filter.command("lm列表", alias={"lml", "lmpl"})
     async def list_prompts_command(self, event: AstrMessageEvent):
         """lm列表"""
-        reserved = self._reserved_prompt_triggers()
-        prompts = [key for key in self.prompt_dict.keys() if key not in reserved]
-        if not prompts:
-            yield event.plain_result("当前没有预设提示词。")
-            return
-
-        msg = "📜 当前预设提示词列表：\n" + "、".join(prompts)
-        yield event.plain_result(msg)
+        yield event.plain_result(self._format_prompt_list())
 
     @filter.command("lm提示词", alias={"lmc", "lm详情", "lmps"})
     async def prompt_details(self, event: AstrMessageEvent, trigger_word: str):
@@ -2051,27 +2062,22 @@ class BigBanana(Star):
             yield event.plain_result(f"❌ 未找到提示词：「{trigger_word}」")
             return
 
-        params = self.prompt_dict[trigger_word]
-        details = [f"📋 提示词详情：「{trigger_word}」"]
-        details.append(params.get("prompt", ""))
-        for key in PARAMS_LIST:
-            if key in params:
-                details.append(f"{key}: {params[key]}")
+        details_text = self._format_prompt_details(trigger_word)
         if event.platform_meta.name == "aiocqhttp":
             from astrbot.api.message_components import Node, Nodes, Plain
 
             nodes = []
-            for detail in details:
+            for detail in details_text.splitlines():
                 nodes.append(
                     Node(
                         uin=event.get_sender_id(),
                         name=event.get_sender_name(),
                         content=[Plain(detail)],
                     )
-                )
+            )
             yield event.chain_result([Nodes(nodes)])
         else:
-            yield event.plain_result("\n".join(details))
+            yield event.plain_result(details_text)
 
     @filter.command("lm删除", alias={"lmd"})
     async def del_prompt_command(self, event: AstrMessageEvent, trigger_word: str = ""):
@@ -2231,6 +2237,20 @@ class BigBanana(Star):
             return
 
         cmd = message_str.split(" ", 1)[0]
+        if cmd in {"lm列表", "lml", "lmpl"}:
+            yield event.plain_result(self._format_prompt_list())
+            event.stop_event()
+            return
+        if cmd in {"lm提示词", "lmc", "lm详情", "lmps"}:
+            _, _, trigger_word = message_str.partition(" ")
+            trigger_word = trigger_word.strip()
+            if not trigger_word:
+                yield event.plain_result(f"❌ 用法：{cmd} <触发词>")
+            else:
+                yield event.plain_result(self._format_prompt_details(trigger_word))
+            event.stop_event()
+            return
+
         # 检查命令是否在提示词配置中
         if cmd not in self.prompt_dict:
             return
