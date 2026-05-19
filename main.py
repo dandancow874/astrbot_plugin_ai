@@ -1,8 +1,10 @@
 import asyncio
+import base64
 import itertools
 import json
 import os
 import re
+import mimetypes
 
 import astrbot.api.message_components as Comp
 from astrbot.api import logger
@@ -39,6 +41,7 @@ PARAMS_LIST = [
     "gather_mode",
     "model",
     "n",
+    "quality",
     "provider",
     "preset",
     "q",
@@ -63,6 +66,15 @@ SUPPORTED_FILE_FORMATS = (
     ".heic",
     ".heif",
 )
+
+MIME_EXT_MAP = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "image/bmp": ".bmp",
+}
 
 # 提供商配置键列表
 provider_keys = ["main_provider", "back_provider", "back_provider2"]
@@ -521,6 +533,81 @@ class BigBanana(Star):
         if not safe:
             safe = "preset"
         return safe[:80]
+
+    @staticmethod
+    def _append_param_if_missing(prompt_text: str, key: str, value: str) -> str:
+        if re.search(rf"(?<!\S)--{re.escape(key)}(?:\s|=|$)", prompt_text):
+            return prompt_text
+        return f"{prompt_text.rstrip()} --{key} {value}".strip()
+
+    @staticmethod
+    def _append_refer_images_param(prompt_text: str, filenames: list[str]) -> str:
+        if not filenames:
+            return prompt_text
+        refs = ",".join(filenames)
+        pattern = re.compile(r"(?<!\S)--refer_images(?:\s+|=)(\S+)")
+        match = pattern.search(prompt_text)
+        if match:
+            existing = [item.strip() for item in match.group(1).split(",") if item.strip()]
+            merged = existing + [item for item in filenames if item not in existing]
+            return prompt_text[: match.start(1)] + ",".join(merged) + prompt_text[match.end(1) :]
+        return f"{prompt_text.rstrip()} --refer_images {refs}".strip()
+
+    def _collect_inline_image_urls(self, event: AstrMessageEvent) -> list[str]:
+        urls: list[str] = []
+        for comp in event.get_messages():
+            if isinstance(comp, Comp.Image) and comp.url:
+                urls.append(comp.url)
+            elif (
+                isinstance(comp, Comp.File)
+                and comp.url
+                and comp.url.startswith("http")
+                and comp.url.lower().endswith(SUPPORTED_FILE_FORMATS)
+            ):
+                urls.append(comp.url)
+        return list(dict.fromkeys(urls))
+
+    async def _save_lmp_refer_images(
+        self, trigger_word: str, image_urls: list[str]
+    ) -> list[str]:
+        if not image_urls:
+            return []
+        os.makedirs(self.refer_images_dir, exist_ok=True)
+        fetched = await self.downloader.fetch_images(image_urls)
+        saved: list[str] = []
+        base_name = self._safe_preset_filename(trigger_word)
+        start_index = 1
+        for mime, b64 in fetched:
+            if not b64:
+                continue
+            ext = MIME_EXT_MAP.get((mime or "").lower())
+            if not ext:
+                ext = mimetypes.guess_extension(mime or "") or ".png"
+            while True:
+                filename = f"{base_name}_{start_index}{ext}"
+                path = self.refer_images_dir / filename
+                start_index += 1
+                if not path.exists():
+                    break
+            try:
+                path.write_bytes(base64.b64decode(b64, validate=False))
+            except Exception as e:
+                logger.warning(f"保存 lmp 参考图失败: {path}, {e}")
+                continue
+            saved.append(filename)
+        return saved
+
+    async def _build_lmp_prompt(
+        self, event: AstrMessageEvent, trigger_word: str, prompt_str: str
+    ) -> str:
+        prompt_str = re.sub(r"\[图片\]|\[image\]", "", prompt_str, flags=re.I).strip()
+        saved_images = await self._save_lmp_refer_images(
+            trigger_word, self._collect_inline_image_urls(event)
+        )
+        if saved_images:
+            prompt_str = self._append_refer_images_param(prompt_str, saved_images)
+            prompt_str = self._append_param_if_missing(prompt_str, "min_images", "1")
+        return f"{trigger_word} {prompt_str.strip()}"
 
     def _export_prompt_preset_files(self, data_dir, lines: list[str]) -> None:
         export_dir = data_dir / "prompt_presets"
@@ -1844,7 +1931,9 @@ class BigBanana(Star):
                     )
                     return
 
-                build_prompt = f"{trigger_word} {reply}"
+                build_prompt = await self._build_lmp_prompt(
+                    event, trigger_word, reply
+                )
                 action = "添加"
 
                 if trigger_word in self.prompt_dict:
@@ -1889,7 +1978,7 @@ class BigBanana(Star):
                 event.stop_event()
             return
 
-        build_prompt = f"{trigger_word} {prompt_str}"
+        build_prompt = await self._build_lmp_prompt(event, trigger_word, prompt_str)
         action = "添加"
 
         if trigger_word in self.prompt_dict:
@@ -2146,6 +2235,15 @@ class BigBanana(Star):
         user_overrode_image_size = "image_size" in user_params
         user_overrode_model = "model" in user_params
         user_overrode_aspect_ratio = "aspect_ratio" in user_params
+        q_param = user_params.get("q")
+        if isinstance(q_param, str) and q_param.strip().lower() in {
+            "auto",
+            "high",
+            "medium",
+            "low",
+        }:
+            user_params["quality"] = q_param.strip().lower()
+            user_params.pop("q", None)
         params["__user_overrode_model__"] = user_overrode_model
         params["__user_overrode_aspect_ratio__"] = user_overrode_aspect_ratio
         params["__user_overrode_image_size__"] = user_overrode_image_size

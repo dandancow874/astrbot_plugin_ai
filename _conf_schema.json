@@ -504,6 +504,18 @@
                 "default": true,
                 "hint": "允许模型使用谷歌搜索工具获取实时信息。当前仅对Gemini规范的 gemini-3 模型有效"
             },
+            "quality": {
+                "description": "GPT Image质量",
+                "type": "string",
+                "options": [
+                    "auto",
+                    "high",
+                    "medium",
+                    "low"
+                ],
+                "default": "auto",
+                "hint": "GPT Image 可选质量参数。命令中可用 --quality high 或 --q high。"
+            },
             "refer_images": {
                 "description": "参考图片",
                 "type": "string",

@@ -77,6 +77,44 @@ myp
 myp 附加提示词
 ```
 
+预设里可以指定参考图。把图片放到插件数据目录的 `refer_images` 文件夹，然后在预设中写文件名：
+
+```
+lmp poster 海报设计 --refer_images ref1.png --min_images 1
+```
+
+多个参考图用英文逗号分隔：
+
+```
+lmp poster 海报设计 --refer_images ref1.png,ref2.jpg --min_images 1
+```
+
+创建预设时如果消息里直接带图片，插件会自动把图片保存到 `refer_images`，并把文件名写进预设：
+
+```
+lmp [图片] poster 海报设计
+```
+
+会变成类似：
+
+```
+poster 海报设计 --refer_images poster_1.png --min_images 1
+```
+
+调用带参考图的预设时，参考图顺序是：预设中的 `refer_images` 在前，调用消息里新发的图片在后。
+
+### GPT Image质量
+
+GPT Image 的 `quality` 不填时由上游默认处理，通常等价于 `auto`。可以在命令或预设里指定：
+
+```
+gpt1 海报设计 --q high
+gpt1 海报设计 --quality medium
+myp --q low
+```
+
+`--q high / medium / low / auto` 会作为 GPT Image 的质量参数；`--q 123456` 仍保留为 QQ 头像参考图参数。
+
 #### 查看预设列表
 
 ```

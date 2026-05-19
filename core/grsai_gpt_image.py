@@ -178,8 +178,16 @@ class GrsaiGPTImageProvider(BaseProvider):
                 params.get("aspect_ratio"), image_b64_list
             ),
         }
+        quality = params.get("quality")
+        if isinstance(quality, str) and quality.strip().lower() in {
+            "auto",
+            "high",
+            "medium",
+            "low",
+        }:
+            payload["quality"] = quality.strip().lower()
         logger.info(
-            f"[GPT Image] request size={payload['size']}, aspect_ratio={params.get('aspect_ratio')}"
+            f"[GPT Image] request size={payload['size']}, quality={payload.get('quality', 'auto')}, aspect_ratio={params.get('aspect_ratio')}"
         )
         if urls:
             payload["urls"] = urls

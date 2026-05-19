@@ -66,6 +66,8 @@ class PromptConfig:
     """图片尺寸/分辨率"""
     google_search: bool = False
     """是否启用谷歌搜索功能"""
+    quality: str = "auto"
+    """GPT Image 图片质量"""
     refer_images: str | None = None
     """引用参考图片的文件名"""
     gather_mode: bool = False
