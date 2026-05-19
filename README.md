@@ -117,6 +117,63 @@ myp --q low
 
 `--q high / medium / low / auto` 会作为 GPT Image 的质量参数；`--q 123456` 仍保留为 QQ 头像参考图参数。
 
+### ComfyUI工作流
+
+把 ComfyUI 工作流导出为 API Format JSON，放到插件目录的 `workflow/` 文件夹，例如：
+
+```
+workflow/转真人.json
+```
+
+管理员也可以在聊天窗口上传工作流，同名文件会直接覆盖：
+
+```
+cf上传 转真人
+```
+
+发送命令后 30 秒内发送 `转真人.json` 文件即可。也可以命令和文件同一条消息发送。
+
+管理员可以直接开关 ComfyUI 环境：
+
+```
+cf开启
+cf关闭
+```
+
+工作流里可以使用这些占位符：
+
+```
+{{prompt}}
+{{image1_base64}}
+{{image2_base64}}
+{{image1_data_url}}
+{{image2_data_url}}
+{{image1}}
+{{image2}}
+{{seed}}
+```
+
+`{{image1_base64}}` / `{{image2_base64}}` 适合 Load Image Base64 节点；`{{image1}}` / `{{image2}}` 会先上传到 ComfyUI `/upload/image`，再替换为普通 LoadImage 节点需要的文件名。
+
+调用：
+
+```
+cf 转真人 更真实一点，电影感
+cf 转真人 [图片] 更真实一点，电影感
+```
+
+也可以创建预设：
+
+```
+lmp 转真人 cf 转真人 {{user_text}} --min_images 1
+```
+
+之后直接发送：
+
+```
+转真人 [图片] 更真实一点，电影感
+```
+
 #### 查看预设列表
 
 ```

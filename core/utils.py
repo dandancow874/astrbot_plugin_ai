@@ -11,7 +11,14 @@ def get_key_index(current_index: int, item_len: int) -> int:
     return (current_index + 1) % item_len
 
 
-def save_images(image_result, path_dir: Path, save_json: bool = False, prompt: str = "", model_name: str = "") -> list[tuple[str, Path]]:
+def save_images(
+    image_result,
+    path_dir: Path,
+    save_json: bool = False,
+    prompt: str = "",
+    model_name: str = "",
+    metadata: dict | None = None,
+) -> list[tuple[str, Path]]:
     """保存图片到本地文件系统，返回 元组(文件名, 文件路径) 列表
     
     参数:
@@ -20,6 +27,7 @@ def save_images(image_result, path_dir: Path, save_json: bool = False, prompt: s
         save_json: 是否同时保存JSON元数据
         prompt: 提示词 (用于JSON元数据)
         model_name: 模型名称 (用于JSON元数据)
+        metadata: 额外 JSON 元数据
     """
     import json
     
@@ -50,6 +58,8 @@ def save_images(image_result, path_dir: Path, save_json: bool = False, prompt: s
                 "tags": [model_name] if model_name else [],
                 "annotation": prompt or ""
             }
+            if isinstance(metadata, dict):
+                json_data.update(metadata)
             json_path = path_dir / f"banana_{current_time_str}.json"
             try:
                 with open(json_path, "w", encoding="utf-8") as f:

@@ -567,6 +567,72 @@ class BigBanana(Star):
                 urls.append(comp.url)
         return list(dict.fromkeys(urls))
 
+    @staticmethod
+    def _safe_workflow_name(name: str) -> str:
+        safe = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(name).strip())
+        safe = safe.strip(" ._")
+        if safe.lower().endswith(".json"):
+            safe = safe[:-5].strip(" ._")
+        return safe[:80]
+
+    def _collect_json_file_urls(self, event: AstrMessageEvent) -> list[str]:
+        urls: list[str] = []
+        for comp in event.get_messages():
+            if (
+                isinstance(comp, Comp.File)
+                and comp.url
+                and comp.url.startswith("http")
+            ):
+                name = str(getattr(comp, "name", "") or "")
+                if comp.url.lower().endswith(".json") or name.lower().endswith(".json"):
+                    urls.append(comp.url)
+        return list(dict.fromkeys(urls))
+
+    async def _download_text_file(self, url: str) -> tuple[str | None, str | None]:
+        try:
+            response = await self.http_manager._get_curl_session().get(
+                url,
+                impersonate="chrome131",
+                proxy=self.common_config.proxy,
+                timeout=30,
+            )
+            if response.status_code >= 400:
+                return None, f"下载文件失败：HTTP {response.status_code}"
+            content = response.content
+            if len(content) > 10 * 1024 * 1024:
+                return None, "工作流文件过大，超过 10MB"
+            return content.decode("utf-8-sig"), None
+        except Exception as e:
+            return None, f"下载文件失败：{e}"
+
+    async def _save_comfyui_workflow_from_event(
+        self, event: AstrMessageEvent, workflow_name: str
+    ) -> tuple[bool, str]:
+        safe_name = self._safe_workflow_name(workflow_name)
+        if not safe_name:
+            return False, "❌ 工作流名称不能为空"
+        urls = self._collect_json_file_urls(event)
+        if not urls:
+            return False, "❌ 请发送 API Format JSON 文件"
+        text, err = await self._download_text_file(urls[0])
+        if err:
+            return False, f"❌ {err}"
+        try:
+            parsed = json.loads(text or "")
+        except Exception as e:
+            return False, f"❌ JSON 格式不正确：{e}"
+        if not isinstance(parsed, dict):
+            return False, "❌ 工作流 JSON 顶层必须是对象"
+
+        workflow_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "workflow"))
+        os.makedirs(workflow_dir, exist_ok=True)
+        path = os.path.abspath(os.path.join(workflow_dir, f"{safe_name}.json"))
+        if os.path.commonpath([workflow_dir, path]) != workflow_dir:
+            return False, "❌ 工作流文件名非法"
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(parsed, f, ensure_ascii=False, indent=2)
+        return True, f"✅ 已上传并覆盖 ComfyUI 工作流：{safe_name}.json"
+
     async def _save_lmp_refer_images(
         self, trigger_word: str, image_urls: list[str]
     ) -> list[str]:
@@ -762,6 +828,7 @@ class BigBanana(Star):
             import_module(f"{pkg}.core.vertex_ai_anonymous")
             import_module(f"{pkg}.core.midjourney")
             import_module(f"{pkg}.core.rh_provider")
+            import_module(f"{pkg}.core.comfyui")
         except Exception as e:
             logger.warning(f"_ensure_provider_registry 导入失败: {e}")
             return
@@ -774,6 +841,7 @@ class BigBanana(Star):
             import_module(f"{pkg}.core.vertex_ai_anonymous")
             import_module(f"{pkg}.core.midjourney")
             import_module(f"{pkg}.core.rh_provider")
+            import_module(f"{pkg}.core.comfyui")
         except Exception:
             return
 
@@ -1213,6 +1281,21 @@ class BigBanana(Star):
             },
             insert_index=7,
         )
+        upsert_fixed_model(
+            conf_key="comfyui_config",
+            name="ComfyUI",
+            default_triggers=["cf"],
+            default_provider_stub={
+                "name": "ComfyUI",
+                "enabled": True,
+                "api_type": "ComfyUI",
+                "keys": [],
+                "api_url": "http://127.0.0.1:8188",
+                "model": "",
+                "stream": False,
+            },
+            insert_index=8,
+        )
 
         if updated_models:
             self.conf["models"] = models_data
@@ -1287,6 +1370,7 @@ class BigBanana(Star):
             "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit --aspect_ratio 2:3 --n 2",
             "gpt1": "gpt1 {{user_text}} --min_images 0 --aspect_ratio 9:16",
             "gpt2": "gpt2 {{user_text}} --min_images 1 --aspect_ratio auto",
+            "cf": "cf {{user_text}} --min_images 0",
         }
         updated_prompts = False
         for trigger, prompt_line in fixed_prompts.items():
@@ -1356,7 +1440,7 @@ class BigBanana(Star):
             self._save_prompt_config_and_backup()
 
     def _reserved_prompt_triggers(self) -> set[str]:
-        reserved = {"gp1", "gp2", "gpt1", "gpt2"}
+        reserved = {"gp1", "gp2", "gpt1", "gpt2", "cf"}
         if hasattr(self, "models"):
             for model in self.models:
                 for trigger in getattr(model, "triggers", []) or []:
@@ -1385,6 +1469,24 @@ class BigBanana(Star):
             if key in params:
                 details.append(f"{key}: {params[key]}")
         return "\n".join(details)
+
+    @staticmethod
+    def _split_comfyui_prompt(prompt: object) -> tuple[str, str]:
+        text = str(prompt or "").strip()
+        if not text:
+            return "", ""
+        workflow, _, user_prompt = text.partition(" ")
+        return workflow.strip(), user_prompt.strip()
+
+    def _set_comfyui_enabled(self, enabled: bool) -> None:
+        comfy_conf = self.conf.get("comfyui_config", {})
+        if not isinstance(comfy_conf, dict):
+            comfy_conf = {}
+        comfy_conf["enabled"] = enabled
+        self.conf["comfyui_config"] = comfy_conf
+        self.conf.save_config()
+        self.init_providers()
+        self.init_prompts()
 
     def parsing_prompt_params(self, prompt: str) -> tuple[list[str], dict]:
         """解析提示词中的参数，若没有指定参数则使用默认值填充。必须是包括命令和参数的完整提示词"""
@@ -1791,6 +1893,83 @@ class BigBanana(Star):
             await waiter(event)
         except TimeoutError:
             yield event.plain_result("❌ 超时，操作已取消。")
+
+    @filter.command("cf上传", alias={"comfy上传", "cf工作流上传"})
+    async def upload_comfyui_workflow_command(
+        self, event: AstrMessageEvent, workflow_name: str = ""
+    ):
+        """cf上传 <工作流名>，发送或等待发送 ComfyUI API Format JSON 文件"""
+        if not self.is_global_admin(event):
+            logger.info(
+                f"用户 {event.get_sender_id()} 试图执行管理员命令 cf上传，权限不足"
+            )
+            return
+
+        raw = (event.message_str or "").strip()
+        if not workflow_name:
+            tokens = raw.split()
+            if len(tokens) >= 2:
+                workflow_name = tokens[1].strip()
+        if not workflow_name:
+            yield event.plain_result("❌ 用法：cf上传 <工作流名>，并发送 JSON 文件")
+            return
+
+        if self._collect_json_file_urls(event):
+            ok, msg = await self._save_comfyui_workflow_from_event(event, workflow_name)
+            yield event.plain_result(msg)
+            if ok:
+                event.stop_event()
+            return
+
+        yield event.plain_result(
+            f"🧩 请在30秒内发送 ComfyUI API Format JSON 文件，将保存为「{self._safe_workflow_name(workflow_name)}.json」。同名文件会直接覆盖。"
+        )
+        operator_id = event.get_sender_id()
+
+        @session_waiter(timeout=30, record_history_chains=False)  # type: ignore
+        async def waiter(controller: SessionController, event: AstrMessageEvent):
+            if event.get_sender_id() != operator_id:
+                return
+            if (event.message_str or "").strip() == "取消":
+                await event.send(event.plain_result("🍌 操作已取消。"))
+                controller.stop()
+                return
+            ok, msg = await self._save_comfyui_workflow_from_event(event, workflow_name)
+            await event.send(event.plain_result(msg))
+            if ok:
+                controller.stop()
+
+        try:
+            await waiter(event)
+        except TimeoutError:
+            yield event.plain_result("❌ 超时了，操作已取消！")
+        except Exception as e:
+            logger.error(f"cf上传工作流出现错误: {e}", exc_info=True)
+            yield event.plain_result("❌ 处理时发生了一个内部错误。")
+        finally:
+            event.stop_event()
+
+    @filter.command("cf开启", alias={"comfy开启", "comfyui开启"})
+    async def enable_comfyui_command(self, event: AstrMessageEvent):
+        """启用 ComfyUI 工作流"""
+        if not self.is_global_admin(event):
+            logger.info(
+                f"用户 {event.get_sender_id()} 试图执行管理员命令 cf开启，权限不足"
+            )
+            return
+        self._set_comfyui_enabled(True)
+        yield event.plain_result("✅ 已启用 ComfyUI 环境，cf 指令可用。")
+
+    @filter.command("cf关闭", alias={"comfy关闭", "comfyui关闭"})
+    async def disable_comfyui_command(self, event: AstrMessageEvent):
+        """关闭 ComfyUI 工作流"""
+        if not self.is_global_admin(event):
+            logger.info(
+                f"用户 {event.get_sender_id()} 试图执行管理员命令 cf关闭，权限不足"
+            )
+            return
+        self._set_comfyui_enabled(False)
+        yield event.plain_result("✅ 已关闭 ComfyUI 环境，cf 指令将提示环境没有启用。")
 
     @filter.command("lm提供商删除", alias={"lmpd"})
     async def del_provider_command(
@@ -2355,6 +2534,12 @@ class BigBanana(Star):
             new_prompt = preset_prompt.replace("{{user_text}}", user_prompt)
             params["prompt"] = new_prompt
 
+        prompt_text = str(params.get("prompt", "") or "").strip()
+        if prompt_text == "cf" or prompt_text.startswith("cf "):
+            params["prompt"] = prompt_text.split(" ", 1)[1].strip() if " " in prompt_text else ""
+            params["__model_name__"] = "ComfyUI"
+            params["__trigger_cmd__"] = "cf"
+
         if cmd == "zimg" and not user_overrode_image_size:
             params["image_size"] = "2K"
 
@@ -2796,8 +2981,24 @@ class BigBanana(Star):
             # 获取提示词和模型名称用于JSON元数据
             prompt_text = params.get("prompt", params.get("user_text", ""))
             model_name = params.get("__model_name__", "")
+            metadata = None
+            if model_name == "ComfyUI" or params.get("__trigger_cmd__") == "cf":
+                workflow_name, comfy_prompt = self._split_comfyui_prompt(prompt_text)
+                prompt_text = comfy_prompt
+                tags = ["comfyui"]
+                if workflow_name:
+                    tags.append(workflow_name)
+                metadata = {
+                    "tags": tags,
+                    "workflow": workflow_name,
+                }
             save_images(
-                valid_results, self.save_dir, self.save_json, prompt_text, model_name
+                valid_results,
+                self.save_dir,
+                self.save_json,
+                prompt_text,
+                model_name,
+                metadata=metadata,
             )
 
         return valid_results, None
@@ -3000,6 +3201,13 @@ class BigBanana(Star):
                             providers=providers,
                             enabled=bool(model_data.get("enabled", True)),
                         )
+
+        if model_name == "ComfyUI" and (
+            not target_model
+            or not target_model.enabled
+            or not target_model.providers
+        ):
+            return None, "ComfyUI 环境没有启用，请在插件设置里启用 comfyui_config，并确认 ComfyUI 服务已启动。"
 
         # 如果未找到指定模型（或未指定），使用第一个启用的模型作为默认
         if not target_model and self.models:

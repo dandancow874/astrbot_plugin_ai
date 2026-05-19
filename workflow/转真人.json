@@ -1,0 +1,174 @@
+{
+  "30": {
+    "inputs": {
+      "prompt": ["201", 0],
+      "clip": ["37", 0],
+      "vae": ["38", 0],
+      "model_config": ["39", 0],
+      "configs": ["42", 0]
+    },
+    "class_type": "EditTextEncode_EditUtils",
+    "_meta": {
+      "title": "EditUtils: EditTextEncode lrzjason"
+    }
+  },
+  "31": {
+    "inputs": {
+      "samples": ["32", 0],
+      "vae": ["38", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "32": {
+    "inputs": {
+      "seed": 838105834212161,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": ["156", 0],
+      "positive": ["30", 0],
+      "negative": ["46", 0],
+      "latent_image": ["30", 1]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "37": {
+    "inputs": {
+      "clip_name": "qwen_3_8b_fp8mixed.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "38": {
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "39": {
+    "inputs": {
+      "instruction": ""
+    },
+    "class_type": "Flux2KleinModelConfig_EditUtils",
+    "_meta": {
+      "title": "EditUtils: Flux2Klein Model Config lrzjason"
+    }
+  },
+  "42": {
+    "inputs": {
+      "to_ref": true,
+      "ref_main_image": true,
+      "ref_longest_edge": 1024,
+      "ref_crop": "pad",
+      "ref_upscale": "lanczos",
+      "image": ["198", 0]
+    },
+    "class_type": "Flux2KleinConfigPreparer_EditUtils",
+    "_meta": {
+      "title": "EditUtils: Flux2Klein Config Preparer lrzjason"
+    }
+  },
+  "46": {
+    "inputs": {
+      "conditioning": ["30", 0]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "47": {
+    "inputs": {
+      "unet_name": "flux-2-klein-9b-fp8.safetensors",
+      "weight_dtype": "default",
+      "Model Manager": null
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "156": {
+    "inputs": {
+      "lora_name": "klein\\klein-9b-turn2real_v1.5_ep9.safetensors",
+      "strength_model": 1,
+      "Model Manager": null,
+      "model": ["47", 0]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "192": {
+    "inputs": {
+      "image": "{{image1_base64}}"
+    },
+    "class_type": "ETN_LoadImageBase64",
+    "_meta": {
+      "title": "Load Image (Base64)"
+    }
+  },
+  "198": {
+    "inputs": {
+      "宽度": 512,
+      "高度": 512,
+      "缩放方法": "按长边等比例",
+      "将边缩放到": 1024,
+      "缩放插值": "Lanczos",
+      "缩放模式": "裁剪",
+      "固定方向": "居中",
+      "执行条件": "总是",
+      "填充颜色": "#364254",
+      "整除数": 16,
+      "图像": ["192", 0]
+    },
+    "class_type": "图像缩放V2_孤海",
+    "_meta": {
+      "title": "图像缩放V2 孤海"
+    }
+  },
+  "199": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": ["31", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "201": {
+    "inputs": {
+      "prompt": "reskin this into a real photo, {{prompt}} "
+    },
+    "class_type": "CR Prompt Text",
+    "_meta": {
+      "title": "提示词文本"
+    }
+  },
+  "214": {
+    "inputs": {
+      "separator": ""
+    },
+    "class_type": "easy promptConcat",
+    "_meta": {
+      "title": "提示词合并"
+    }
+  }
+}

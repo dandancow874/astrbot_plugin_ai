@@ -360,6 +360,36 @@
             }
         }
     },
+    "comfyui_config": {
+        "description": "🧩 ComfyUI 本地/局域网工作流配置",
+        "type": "object",
+        "hint": "cf 会使用这里配置的 ComfyUI 地址。工作流请导出 API Format JSON，放到插件目录 workflow/ 下，例如 workflow/转真人.json。",
+        "items": {
+            "enabled": {
+                "description": "启用",
+                "type": "bool",
+                "default": true
+            },
+            "primary": {
+                "description": "ComfyUI 服务",
+                "type": "object",
+                "items": {
+                    "api_url": {
+                        "description": "ComfyUI 地址",
+                        "type": "string",
+                        "default": "http://127.0.0.1:8188",
+                        "hint": "局域网机器示例：http://192.168.1.20:8188。不要填 /prompt，填 ComfyUI 根地址。"
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "本地 ComfyUI 通常不需要，留空即可。"
+                    }
+                }
+            }
+        }
+    },
     "models": {
         "description": "➕ 额外模型方案配置",
         "type": "list",
@@ -403,7 +433,8 @@
                             "OpenAI_Chat",
                             "OpenAI_Images",
                             "Vertex_AI_Anonymous",
-                            "Grsai_GPT_Image"
+                            "Grsai_GPT_Image",
+                            "ComfyUI"
                         ],
                         "default": "Gemini"
                     },

@@ -1,4 +1,5 @@
 from .base import BaseProvider
+from .comfyui import ComfyUIProvider
 from .downloader import Downloader
 from .gemini import GeminiProvider
 from .grsai_gpt_image import GrsaiGPTImageProvider
@@ -13,6 +14,7 @@ __all__ = [
     "HttpManager",
     "Downloader",
     "BaseProvider",
+    "ComfyUIProvider",
     "GeminiProvider",
     "GrsaiGPTImageProvider",
     "OpenAIChatProvider",

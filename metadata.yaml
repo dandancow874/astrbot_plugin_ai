@@ -1,7 +1,7 @@
 name: astrbot_plugin_ai
 display_name: ai生图
 desc: 图片生成插件
-version: v0.2.3
+version: v0.2.4
 author: dandancow874
 repo: https://github.com/dandancow874/astrbot_plugin_ai
 
