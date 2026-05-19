@@ -2035,12 +2035,6 @@ class BigBanana(Star):
     @filter.command("lm列表", alias={"lml", "lmpl"})
     async def list_prompts_command(self, event: AstrMessageEvent):
         """lm列表"""
-        if not self.is_global_admin(event):
-            logger.info(
-                f"用户 {event.get_sender_id()} 试图执行管理员命令 lm列表，权限不足"
-            )
-            return
-
         reserved = self._reserved_prompt_triggers()
         prompts = [key for key in self.prompt_dict.keys() if key not in reserved]
         if not prompts:
