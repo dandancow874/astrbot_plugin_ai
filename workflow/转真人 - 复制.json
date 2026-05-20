@@ -24,7 +24,7 @@
   },
   "32": {
     "inputs": {
-      "seed": 838105834212161,
+      "seed": 527742549621168,
       "steps": 8,
       "cfg": 1,
       "sampler_name": "euler",
@@ -106,7 +106,7 @@
   "156": {
     "inputs": {
       "lora_name": "klein\\klein-9b-turn2real_v1.5_ep9.safetensors",
-      "strength_model": 1,
+      "strength_model": 0.9,
       "Model Manager": null,
       "model": ["47", 0]
     },
@@ -155,7 +155,7 @@
   },
   "201": {
     "inputs": {
-      "prompt": "reskin this into a real photo, {{prompt}} "
+      "prompt": "转为写实风格, 亚洲女性, {{prompt}} "
     },
     "class_type": "CR Prompt Text",
     "_meta": {

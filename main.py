@@ -2123,24 +2123,19 @@ class BigBanana(Star):
             return
 
         raw = (event.message_str or "").strip()
-        if not trigger_word:
-            tokens = raw.split()
-            if len(tokens) >= 2:
-                trigger_word = tokens[1]
-            else:
-                yield event.plain_result("❌ 用法：lmp <触发词> <提示词内容>")
-                return
+        tokens = raw.split(maxsplit=2)
+        if len(tokens) >= 2:
+            trigger_word = tokens[1].strip()
+            prompt_str = tokens[2].strip() if len(tokens) >= 3 else ""
+        elif not trigger_word:
+            yield event.plain_result("❌ 用法：lmp <触发词> <提示词内容>")
+            return
 
         if self._is_reserved_prompt_trigger(trigger_word):
             yield event.plain_result(
                 f"❌「{trigger_word}」是内置模型触发词，不能作为预设添加或更新。"
             )
             return
-
-        if raw and trigger_word in raw:
-            suffix = raw.split(trigger_word, 1)[1].strip()
-            if suffix:
-                prompt_str = suffix
 
         if not prompt_str.strip():
             yield event.plain_result(
