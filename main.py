@@ -2124,9 +2124,14 @@ class BigBanana(Star):
 
         raw = (event.message_str or "").strip()
         tokens = raw.split(maxsplit=2)
-        if len(tokens) >= 2:
+        command_names = {"lmp"}
+        if len(tokens) >= 2 and tokens[0] in command_names:
             trigger_word = tokens[1].strip()
             prompt_str = tokens[2].strip() if len(tokens) >= 3 else ""
+        elif len(tokens) >= 2 and tokens[0] == str(trigger_word or "").strip():
+            prompt_str = tokens[1].strip()
+        elif len(tokens) == 1 and tokens[0] == str(trigger_word or "").strip():
+            prompt_str = ""
         elif not trigger_word:
             yield event.plain_result("❌ 用法：lmp <触发词> <提示词内容>")
             return
