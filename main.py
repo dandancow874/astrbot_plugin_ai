@@ -2771,7 +2771,15 @@ class BigBanana(Star):
 
             # 组装消息链
             os.makedirs(task_temp_dir, exist_ok=True)
-            msg_chain = self.build_message_chain(event, results, task_temp_dir)
+            if (
+                self._is_comfyui_params(params)
+                and event.platform_meta.name == "aiocqhttp"
+            ):
+                msg_chain = self.build_comfyui_forward_chain(
+                    event, params, results, task_temp_dir
+                )
+            else:
+                msg_chain = self.build_message_chain(event, results, task_temp_dir)
 
             yield event.chain_result(msg_chain)
         except asyncio.CancelledError:
@@ -3567,6 +3575,68 @@ class BigBanana(Star):
             msg_chain.extend(Comp.Image.fromBase64(b64) for _, b64 in image_items)
 
         return msg_chain
+
+    def build_comfyui_forward_chain(
+        self,
+        event: AstrMessageEvent,
+        params: dict,
+        results: list[tuple[str, str]],
+        temp_dir=None,
+    ) -> list[BaseMessageComponent]:
+        """ComfyUI 结果用合并聊天记录发送，避免直接刷图。"""
+        from astrbot.api.message_components import Node, Nodes, Plain
+
+        if temp_dir is None:
+            temp_dir = self.temp_dir
+
+        workflow_name, comfy_prompt = self._split_comfyui_prompt(
+            params.get("prompt", "")
+        )
+        title = "ComfyUI"
+        if workflow_name:
+            title += f" · {workflow_name}"
+        if comfy_prompt:
+            title += f"\n{comfy_prompt}"
+
+        uin = event.get_self_id() or event.get_sender_id()
+        nodes = [
+            Node(
+                uin=uin,
+                name="ComfyUI",
+                content=[Plain(title)],
+            )
+        ]
+
+        file_items: list[tuple[str, str]] = []
+        image_index = 1
+        for mime, b64 in results:
+            mime = (mime or "").strip()
+            if not b64:
+                continue
+            if mime.startswith("image/"):
+                nodes.append(
+                    Node(
+                        uin=uin,
+                        name=f"ComfyUI #{image_index}",
+                        content=[Comp.Image.fromBase64(b64)],
+                    )
+                )
+                image_index += 1
+            else:
+                file_items.append((mime or "application/octet-stream", b64))
+
+        if file_items:
+            save_results = save_images(file_items, temp_dir)
+            for name_, path_ in save_results:
+                nodes.append(
+                    Node(
+                        uin=uin,
+                        name="ComfyUI File",
+                        content=[Comp.File(name=name_, file=str(path_))],
+                    )
+                )
+
+        return [Nodes(nodes)]
 
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
