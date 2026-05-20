@@ -1462,6 +1462,7 @@ class BigBanana(Star):
         return "📜 当前预设提示词列表：\n" + "、".join(prompts)
 
     def _format_prompt_details(self, trigger_word: str) -> str:
+        trigger_word = self._clean_command_text(trigger_word).split(maxsplit=1)[0].strip()
         if trigger_word not in self.prompt_dict:
             return f"❌ 未找到提示词：「{trigger_word}」"
         params = self.prompt_dict[trigger_word]
@@ -1471,6 +1472,12 @@ class BigBanana(Star):
             if key in params:
                 details.append(f"{key}: {params[key]}")
         return "\n".join(details)
+
+    @staticmethod
+    def _clean_command_text(text: object) -> str:
+        cleaned = str(text or "")
+        cleaned = re.sub(r"\[MSG_ID:[^\]]+\]", "", cleaned, flags=re.I)
+        return cleaned.strip()
 
     @staticmethod
     def _split_comfyui_prompt(prompt: object) -> tuple[str, str]:
@@ -1914,7 +1921,7 @@ class BigBanana(Star):
             )
             return
 
-        raw = (event.message_str or "").strip()
+        raw = self._clean_command_text(event.message_str)
         if not workflow_name:
             tokens = raw.split()
             if len(tokens) >= 2:
@@ -2122,7 +2129,7 @@ class BigBanana(Star):
             )
             return
 
-        raw = (event.message_str or "").strip()
+        raw = self._clean_command_text(event.message_str)
         tokens = raw.split(maxsplit=2)
         command_names = {"lmp"}
         if len(tokens) >= 2 and tokens[0] in command_names:
@@ -2155,7 +2162,7 @@ class BigBanana(Star):
                     )
                     return
 
-                reply = (event.message_str or "").strip()
+                reply = self._clean_command_text(event.message_str)
                 if not reply:
                     await event.send(
                         event.plain_result("❌ 提示词内容不能为空，请重新发送。")
@@ -2246,6 +2253,10 @@ class BigBanana(Star):
     @filter.command("lm提示词", alias={"lmc", "lm详情", "lmps"})
     async def prompt_details(self, event: AstrMessageEvent, trigger_word: str):
         """获取提示词详情字符串"""
+        trigger_word = self._clean_command_text(trigger_word).split(maxsplit=1)[0].strip()
+        if not trigger_word:
+            yield event.plain_result("❌ 用法：lmps <触发词>")
+            return
         if trigger_word not in self.prompt_dict:
             yield event.plain_result(f"❌ 未找到提示词：「{trigger_word}」")
             return
@@ -2396,6 +2407,7 @@ class BigBanana(Star):
             message_str = " ".join(comp.text for comp in plain_components).strip()
         else:
             message_str = event.message_str
+        message_str = self._clean_command_text(message_str)
         # 跳过空消息
         if not message_str:
             return
@@ -2431,7 +2443,7 @@ class BigBanana(Star):
             return
         if cmd in {"lm提示词", "lmc", "lm详情", "lmps"}:
             _, _, trigger_word = message_str.partition(" ")
-            trigger_word = trigger_word.strip()
+            trigger_word = self._clean_command_text(trigger_word).split(maxsplit=1)[0].strip()
             if not trigger_word:
                 yield event.plain_result(f"❌ 用法：{cmd} <触发词>")
             else:
