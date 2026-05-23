@@ -125,7 +125,7 @@ class BigBananaTool(FunctionTool[AstrAgentContext]):
     name: str = "banana_image_generation"  # 工具名称
     # fmt: off
     description: str = (
-"This tool uses the Nano Banana Pro model for image generation."
+"Use this tool whenever the user asks to generate, create, draw, make, edit, or transform an image."
 "It supports both text-based generation and image-reference generation. When a user requests"
 "generation based on an image, you must first verify whether a valid image is present"
 "in the user's current message or in the message they are replying to. Textual pointers"
@@ -164,6 +164,14 @@ class BigBananaTool(FunctionTool[AstrAgentContext]):
                     "description": ("If the user requests to use another person's avatar,"
 "please enter the target user's ID here. Pass this parameter together with the prompt parameter."),
                 },
+                "aspect_ratio": {
+                    "type": "string",
+                    "description": ("Optional image aspect ratio requested by the user, such as 16:9, 9:16, 1:1, 4:3, 3:4, 2:1, 3:1, 4:1, 8:5, 5:3, or auto."),
+                },
+                "image_id": {
+                    "type": "string",
+                    "description": ("Optional saved image id created by the lmd command. Use this when the user writes --id <name> or asks to use a saved reference image id."),
+                },
             },
             "required": ["prompt"],
         }
@@ -184,6 +192,8 @@ class BigBananaTool(FunctionTool[AstrAgentContext]):
         prompt = kwargs.get("prompt", "anything")
         preset_name = kwargs.get("preset_name", None)
         referer_id = kwargs.get("referer_id", [])
+        aspect_ratio = kwargs.get("aspect_ratio", None)
+        image_id = kwargs.get("image_id", None)
 
         # 群白名单判断
         if (
@@ -219,6 +229,20 @@ class BigBananaTool(FunctionTool[AstrAgentContext]):
                 params = plugin.prompt_dict.get(preset_name, {})
         if prompt:
             params["prompt"] = prompt
+            try:
+                _, parsed_params = plugin.parsing_prompt_params(f"llm {prompt}")
+                parsed_prompt = parsed_params.pop("prompt", "")
+                if parsed_prompt:
+                    params["prompt"] = parsed_prompt
+                for key, value in parsed_params.items():
+                    params[key] = value
+            except Exception as e:
+                logger.warning(f"[BIG BANANA] 解析 LLM 工具提示词参数失败: {e}")
+        if aspect_ratio:
+            params["aspect_ratio"] = str(aspect_ratio).strip()
+            params["__user_overrode_aspect_ratio__"] = True
+        if image_id:
+            params["id"] = str(image_id).strip()
         if "{{user_text}}" in prompt:
             logger.warning("[BIG BANANA] 提示词中包含未替换的占位符 {{user_text}}")
             return (
