@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import itertools
 import json
 import os
 import re
@@ -45,6 +44,7 @@ PARAMS_LIST = [
     "provider",
     "preset",
     "avatar",
+    "id",
     "q",
 ]
 
@@ -456,6 +456,7 @@ class BigBanana(Star):
         # 数据目录
         self.data_dir = StarTools.get_data_dir("astrbot_plugin_big_banana")
         self.refer_images_dir = self.data_dir / "refer_images"
+        self.id_images_dir = self.data_dir / "id_images"
         self.save_dir = self.data_dir / "save_images"
         # 临时文件目录
         self.temp_dir = self.data_dir / "temp_images"
@@ -474,6 +475,7 @@ class BigBanana(Star):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
         # 初始化文件目录
         os.makedirs(self.refer_images_dir, exist_ok=True)
+        os.makedirs(self.id_images_dir, exist_ok=True)
         os.makedirs(self.temp_dir, exist_ok=True)
         if self.save_images:
             os.makedirs(self.save_dir, exist_ok=True)
@@ -536,6 +538,14 @@ class BigBanana(Star):
         safe = safe.strip(" ._")
         if not safe:
             safe = "preset"
+        return safe[:80]
+
+    @staticmethod
+    def _safe_image_id(name: str) -> str:
+        safe = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(name).strip())
+        safe = safe.strip(" ._")
+        if not safe:
+            safe = "image"
         return safe[:80]
 
     @staticmethod
@@ -667,6 +677,70 @@ class BigBanana(Star):
             saved.append(filename)
         return saved
 
+    def _id_image_paths(self, image_id: str) -> list[object]:
+        safe_id = self._safe_image_id(image_id)
+        if not safe_id:
+            return []
+        return sorted(self.id_images_dir.glob(f"{safe_id}_*"))
+
+    async def _save_lmd_images(
+        self, image_id: str, image_urls: list[str]
+    ) -> tuple[bool, str]:
+        image_id = str(image_id or "").strip()
+        if not image_id:
+            return False, "❌ 用法：lmd <id>，并发送或回复图片"
+        if not image_urls:
+            return False, "❌ 未找到图片，请发送图片或回复一条带图片的消息"
+
+        os.makedirs(self.id_images_dir, exist_ok=True)
+        fetched = await self.downloader.fetch_images(image_urls)
+        if not fetched:
+            return False, "❌ 图片下载失败"
+
+        safe_id = self._safe_image_id(image_id)
+        for old_path in self._id_image_paths(image_id):
+            try:
+                if old_path.is_file():
+                    old_path.unlink()
+            except Exception as e:
+                logger.warning(f"删除旧 id 图片失败: {old_path}, {e}")
+
+        saved_count = 0
+        for index, (mime, b64) in enumerate(fetched, start=1):
+            if not b64:
+                continue
+            ext = MIME_EXT_MAP.get((mime or "").lower())
+            if not ext:
+                ext = mimetypes.guess_extension(mime or "") or ".png"
+            path = self.id_images_dir / f"{safe_id}_{index}{ext}"
+            try:
+                path.write_bytes(base64.b64decode(b64, validate=False))
+                saved_count += 1
+            except Exception as e:
+                logger.warning(f"保存 id 图片失败: {path}, {e}")
+
+        if saved_count <= 0:
+            return False, "❌ 图片保存失败"
+        return True, f"✅ 已保存图片 id：{image_id}（{saved_count} 张）"
+
+    async def _load_id_images(self, image_ids: object) -> list[tuple[str, str]]:
+        if not image_ids:
+            return []
+        tokens = [
+            item.strip()
+            for item in re.split(r"[,，\s]+", str(image_ids))
+            if item.strip()
+        ]
+        results: list[tuple[str, str]] = []
+        for image_id in tokens:
+            for path in self._id_image_paths(image_id):
+                if not path.is_file():
+                    continue
+                mime_type, b64_data = await asyncio.to_thread(read_file, path)
+                if b64_data:
+                    results.append((mime_type, b64_data))
+        return results
+
     async def _build_lmp_prompt(
         self, event: AstrMessageEvent, trigger_word: str, prompt_str: str
     ) -> str:
@@ -718,9 +792,7 @@ class BigBanana(Star):
                 file_content = (
                     f"# {trigger}\n\n"
                     f"## Prompt\n\n"
-                    f"{prompt_text.strip()}\n\n"
-                    f"## Raw\n\n"
-                    f"```text\n{line}\n```\n"
+                    f"{prompt_text.strip()}\n"
                 )
                 (export_dir / filename).write_text(file_content, encoding="utf-8")
 
@@ -1509,10 +1581,13 @@ class BigBanana(Star):
     def parsing_prompt_params(self, prompt: str) -> tuple[list[str], dict]:
         """解析提示词中的参数，若没有指定参数则使用默认值填充。必须是包括命令和参数的完整提示词"""
 
-        # 以空格分割单词
-        tokens = prompt.split()
+        prompt = str(prompt or "")
+        token_matches = list(re.finditer(r"\S+", prompt))
+        if not token_matches:
+            return [], {"prompt": ""}
+
         # 第一个单词作为命令或命令列表
-        cmd_raw = tokens[0]
+        cmd_raw = token_matches[0].group(0)
 
         # 解析多触发词
         if cmd_raw.startswith("[") and cmd_raw.endswith("]"):
@@ -1521,18 +1596,16 @@ class BigBanana(Star):
         else:
             cmd_list = [cmd_raw]
 
-        # 迭代器跳过第一个单词
-        tokens_iter = iter(tokens[1:])
         # 提示词传递参数列表
         params = {}
-        # 过滤后的提示词单词列表
-        filtered = []
+        # 参数在原文中的区间，后面从提示词正文中剔除，但保留正文原有换行。
+        remove_spans: list[tuple[int, int]] = []
 
         # 解析参数
-        while True:
-            token = next(tokens_iter, None)
-            if token is None:
-                break
+        index = 1
+        while index < len(token_matches):
+            match = token_matches[index]
+            token = match.group(0)
             if token.startswith("--"):
                 key = token[2:]
                 inline_value = None
@@ -1543,17 +1616,23 @@ class BigBanana(Star):
                     key = PARAMS_ALIAS_MAP[key]
                 # 仅处理已知参数
                 if key in PARAMS_LIST:
-                    value = inline_value if inline_value is not None else next(tokens_iter, None)
+                    span_start = match.start()
+                    span_end = match.end()
+                    value = inline_value
+                    if inline_value is None and index + 1 < len(token_matches):
+                        next_match = token_matches[index + 1]
+                        next_token = next_match.group(0)
+                        if not next_token.startswith("--"):
+                            value = next_token
+                            span_end = next_match.end()
+                            index += 1
                     if value is None:
                         params[key] = True
-                        break
-                    value = value.strip()
-                    if value.startswith("--"):
-                        params[key] = True
-                        # 将被提前迭代的单词放回迭代流的最前端
-                        tokens_iter = itertools.chain([value], tokens_iter)
+                        remove_spans.append((span_start, span_end))
+                        index += 1
                         continue
-                    elif value.lower() == "true":
+                    value = value.strip()
+                    if value.lower() == "true":
                         params[key] = True
                     elif value.lower() == "false":
                         params[key] = False
@@ -1570,12 +1649,23 @@ class BigBanana(Star):
                                 .replace("\\", ":")
                             )
                         params[key] = value
+                    remove_spans.append((span_start, span_end))
+                    index += 1
                     continue
-            filtered.append(token)
+            index += 1
 
-        # 重新组合提示词
-        prompt = " ".join(filtered)
-        params["prompt"] = prompt
+        # 重新组合提示词：剔除命令和参数，保留正文内部原始换行。
+        body = prompt[token_matches[0].end() :]
+        body_offset = token_matches[0].end()
+        if remove_spans:
+            chunks: list[str] = []
+            cursor = body_offset
+            for start, end in sorted(remove_spans):
+                chunks.append(prompt[cursor:start])
+                cursor = end
+            chunks.append(prompt[cursor:])
+            body = "".join(chunks)
+        params["prompt"] = body.strip()
         return cmd_list, params
 
     # === 辅助功能：判断管理员，用于静默跳出 ===
@@ -2268,20 +2358,53 @@ class BigBanana(Star):
         if event.platform_meta.name == "aiocqhttp":
             from astrbot.api.message_components import Node, Nodes, Plain
 
-            nodes = []
-            for detail in details_text.splitlines():
-                nodes.append(
-                    Node(
-                        uin=event.get_sender_id(),
-                        name=event.get_sender_name(),
-                        content=[Plain(detail)],
-                    )
-            )
+            nodes = [
+                Node(
+                    uin=event.get_sender_id(),
+                    name=event.get_sender_name(),
+                    content=[Plain(details_text)],
+                )
+            ]
             yield event.chain_result([Nodes(nodes)])
         else:
             yield event.plain_result(details_text)
 
-    @filter.command("lm删除", alias={"lmd"})
+    @filter.command("lmd")
+    async def save_id_image_command(self, event: AstrMessageEvent, image_id: str = ""):
+        """lmd <id> 保存图片，供 --id <id> 调用"""
+        if not self.is_global_admin(event):
+            logger.info(
+                f"用户 {event.get_sender_id()} 试图执行管理员命令 lmd，权限不足"
+            )
+            return
+
+        image_id = self._clean_command_text(image_id).split(maxsplit=1)[0].strip()
+        ok, msg = await self._save_lmd_images(
+            image_id, self._collect_image_urls(event)
+        )
+        yield event.plain_result(msg)
+        event.stop_event()
+
+    @filter.command("lmid")
+    async def show_id_image_command(self, event: AstrMessageEvent, image_id: str = ""):
+        """lmid <id> 查看保存的 id 图片"""
+        image_id = self._clean_command_text(image_id).split(maxsplit=1)[0].strip()
+        if not image_id:
+            yield event.plain_result("❌ 用法：lmid <id>")
+            return
+        images = await self._load_id_images(image_id)
+        if not images:
+            yield event.plain_result(f"❌ 未找到图片 id：「{image_id}」")
+            return
+        msg_chain: list[BaseMessageComponent] = [
+            Comp.Reply(id=event.message_obj.message_id),
+            Comp.Plain(f"图片 id：{image_id}（{len(images)} 张）"),
+        ]
+        msg_chain.extend(Comp.Image.fromBase64(b64) for _, b64 in images)
+        yield event.chain_result(msg_chain)
+        event.stop_event()
+
+    @filter.command("lm删除")
     async def del_prompt_command(self, event: AstrMessageEvent, trigger_word: str = ""):
         """lm删除 <触发词>"""
         if not self.is_global_admin(event):
@@ -2456,6 +2579,38 @@ class BigBanana(Star):
                 yield event.plain_result(f"❌ 用法：{cmd} <触发词>")
             else:
                 yield event.plain_result(self._format_prompt_details(trigger_word))
+            event.stop_event()
+            return
+        if cmd == "lmd":
+            if not self.is_global_admin(event):
+                logger.info(
+                    f"用户 {event.get_sender_id()} 试图执行管理员命令 lmd，权限不足"
+                )
+                return
+            _, _, image_id = message_str.partition(" ")
+            image_id = self._clean_command_text(image_id).split(maxsplit=1)[0].strip()
+            _, msg = await self._save_lmd_images(
+                image_id, self._collect_image_urls(event)
+            )
+            yield event.plain_result(msg)
+            event.stop_event()
+            return
+        if cmd == "lmid":
+            _, _, image_id = message_str.partition(" ")
+            image_id = self._clean_command_text(image_id).split(maxsplit=1)[0].strip()
+            if not image_id:
+                yield event.plain_result("❌ 用法：lmid <id>")
+            else:
+                images = await self._load_id_images(image_id)
+                if not images:
+                    yield event.plain_result(f"❌ 未找到图片 id：「{image_id}」")
+                else:
+                    msg_chain: list[BaseMessageComponent] = [
+                        Comp.Reply(id=event.message_obj.message_id),
+                        Comp.Plain(f"图片 id：{image_id}（{len(images)} 张）"),
+                    ]
+                    msg_chain.extend(Comp.Image.fromBase64(b64) for _, b64 in images)
+                    yield event.chain_result(msg_chain)
             event.stop_event()
             return
 
@@ -2935,13 +3090,17 @@ class BigBanana(Star):
                     mime_type, b64_data = await asyncio.to_thread(read_file, path)
                     if b64_data:
                         image_b64_list.append((mime_type, b64_data))
+        id_image_b64_list = await self._load_id_images(params.get("id"))
         # 图片去重并固定顺序：预设 refer_images 在前，@头像/--q 头像在中，消息图片在后。
         image_urls = list(dict.fromkeys(avatar_image_urls + direct_image_urls))
         params["__source_image_urls__"] = image_urls
         # 判断图片数量是否满足最小要求
         # 图生图模式必须满足图片要求，文生图模式跳过此检查
-        if is_i2i_mode and len(image_urls) + len(image_b64_list) < min_required_images:
-            warn_msg = f"图片数量不足，最少需要 {min_required_images} 张图片，当前仅 {len(image_urls) + len(image_b64_list)} 张"
+        available_image_count = (
+            len(image_urls) + len(image_b64_list) + len(id_image_b64_list)
+        )
+        if is_i2i_mode and available_image_count < min_required_images:
+            warn_msg = f"图片数量不足，最少需要 {min_required_images} 张图片，当前仅 {available_image_count} 张"
             logger.warning(warn_msg)
             return None, warn_msg
 
@@ -2959,9 +3118,23 @@ class BigBanana(Star):
 
             # 如果 min_required_images 为 0，列表为空是允许的
             # 图生图模式才检查图片下载失败
-            if not image_b64_list and min_required_images > 0 and is_i2i_mode:
+            if (
+                not image_b64_list
+                and not id_image_b64_list
+                and min_required_images > 0
+                and is_i2i_mode
+            ):
                 logger.error("全部参考图片下载失败")
                 return None, "全部参考图片下载失败"
+
+        if id_image_b64_list:
+            remaining_count = max_allowed_images - len(image_b64_list)
+            if remaining_count > 0:
+                if len(id_image_b64_list) > remaining_count:
+                    logger.warning(
+                        f"--id 图片数量超过剩余可用数量，将只使用前 {remaining_count} 张"
+                    )
+                image_b64_list.extend(id_image_b64_list[:remaining_count])
 
         # 发送绘图中提示
         model_display_name = self._resolve_model_display_name(
