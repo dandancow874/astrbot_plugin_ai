@@ -44,6 +44,7 @@ PARAMS_LIST = [
     "quality",
     "provider",
     "preset",
+    "avatar",
     "q",
 ]
 
@@ -53,6 +54,7 @@ PARAMS_ALIAS_MAP = {
     "ar": "aspect_ratio",
     "r": "aspect_ratio",
     "ps": "preset",
+    "头像": "avatar",
 }
 
 # 支持的文件格式
@@ -2822,6 +2824,11 @@ class BigBanana(Star):
 
         if referer_id is None:
             referer_id = []
+        trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
+        is_i2i_mode = trigger_cmd in {"bp2", "edit", "bt2", "mj2", "nj2", "gpt2"}
+        use_at_avatar = bool(params.get("avatar", False))
+        avatar_image_urls: list[str] = []
+        direct_image_urls: list[str] = list(image_urls)
         # 小标记，用于优化At头像。当At对象是被引用消息的发送者时，跳过一次。
         skipped_at_qq = False
         reply_sender_id = ""
@@ -2831,7 +2838,7 @@ class BigBanana(Star):
                     event, comp
                 )
                 if reply_urls:
-                    image_urls.extend(reply_urls)
+                    direct_image_urls.extend(reply_urls)
             # 处理At对象的QQ头像（对于艾特机器人的问题，还没有特别好的解决方案）
             elif (
                 isinstance(comp, Comp.At)
@@ -2856,27 +2863,27 @@ class BigBanana(Star):
                 ):
                     skipped_at_qq = True
                     continue
-                # 只有图生图模式才添加At头像作为参考图
-                # is_i2i_mode 需要在循环之前计算
-                trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
-                if trigger_cmd in {"bp2", "edit", "bt2", "mj2", "nj2", "gpt2"}:
-                    image_urls.append(f"https://q.qlogo.cn/g?b=qq&s=0&nk={comp.qq}")
+                # --头像 可让预设/文生图显式使用 @ 群友头像；图生图触发词保留旧行为。
+                if use_at_avatar or is_i2i_mode:
+                    avatar_image_urls.append(
+                        f"https://q.qlogo.cn/g?b=qq&s=0&nk={comp.qq}"
+                    )
             elif isinstance(comp, Comp.Image) and comp.url:
-                image_urls.append(comp.url)
+                direct_image_urls.append(comp.url)
             elif (
                 isinstance(comp, Comp.File)
                 and comp.url
                 and comp.url.startswith("http")
                 and comp.url.lower().endswith(SUPPORTED_FILE_FORMATS)
             ):
-                image_urls.append(comp.url)
+                direct_image_urls.append(comp.url)
 
         q_value = params.get("q")
         if q_value and event.platform_meta.name == "aiocqhttp":
             for qq in re.findall(r"\d+", str(q_value)):
                 build_url = f"https://q.qlogo.cn/g?b=qq&s=0&nk={qq}"
-                if build_url not in image_urls:
-                    image_urls.append(build_url)
+                if build_url not in avatar_image_urls:
+                    avatar_image_urls.append(build_url)
 
         # 处理referer_id参数，获取指定用户头像
         if is_llm_tool and referer_id and event.platform_meta.name == "aiocqhttp":
@@ -2884,20 +2891,19 @@ class BigBanana(Star):
                 target_id = target_id.strip()
                 if target_id:
                     build_url = f"https://q.qlogo.cn/g?b=qq&s=0&nk={target_id}"
-                    if build_url not in image_urls:
-                        image_urls.append(
+                    if build_url not in avatar_image_urls:
+                        avatar_image_urls.append(
                             f"https://q.qlogo.cn/g?b=qq&s=0&nk={target_id}"
                         )
 
-        trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
-        is_i2i_mode = trigger_cmd in {"bp2", "edit", "bt2", "mj2", "nj2", "gpt2"}
         if (
             is_i2i_mode
-            and not image_urls
+            and not avatar_image_urls
+            and not direct_image_urls
             and not params.get("refer_images")
             and event.platform_meta.name == "aiocqhttp"
         ):
-            image_urls.append(
+            avatar_image_urls.append(
                 f"https://q.qlogo.cn/g?b=qq&s=0&nk={event.get_sender_id()}"
             )
 
@@ -2906,12 +2912,12 @@ class BigBanana(Star):
         # 如果图片数量不满足最小要求，且消息平台是Aiocqhttp，取消息发送者头像作为参考图片
         # 只有图生图模式才添加头像
         if (
-            len(image_urls) < min_required_images
+            len(avatar_image_urls) + len(direct_image_urls) < min_required_images
             and int(min_required_images or 0) >= 1
             and is_i2i_mode
             and event.platform_meta.name == "aiocqhttp"
         ):
-            image_urls.append(
+            avatar_image_urls.append(
                 f"https://q.qlogo.cn/g?b=qq&s=0&nk={event.get_sender_id()}"
             )
 
@@ -2929,8 +2935,8 @@ class BigBanana(Star):
                     mime_type, b64_data = await asyncio.to_thread(read_file, path)
                     if b64_data:
                         image_b64_list.append((mime_type, b64_data))
-        # 图片去重
-        image_urls = list(dict.fromkeys(image_urls))
+        # 图片去重并固定顺序：预设 refer_images 在前，@头像/--q 头像在中，消息图片在后。
+        image_urls = list(dict.fromkeys(avatar_image_urls + direct_image_urls))
         params["__source_image_urls__"] = image_urls
         # 判断图片数量是否满足最小要求
         # 图生图模式必须满足图片要求，文生图模式跳过此检查
