@@ -745,6 +745,19 @@
             }
         }
     },
+    "fuzzy_trigger_config": {
+        "description": "自然语言兜底触发",
+        "type": "object",
+        "hint": "关闭时，自然语言“帮我生图”会优先交给 AstrBot 的 skill/tool-call；明确触发词和预设不受影响。",
+        "items": {
+            "enabled": {
+                "description": "启用自然语言兜底",
+                "type": "bool",
+                "default": false,
+                "hint": "开启后，未命中触发词/预设但包含“帮我生成、生图、画张”等关键词时，插件会直接接管生图。"
+            }
+        }
+    },
     "save_images": {
         "description": "图片存储",
         "type": "object",

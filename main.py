@@ -473,6 +473,11 @@ class AIImage(Star):
         self.prefix_list = prefix_config.get("prefix_list", [])
         self.require_at_in_group = bool(prefix_config.get("require_at_in_group", False))
 
+        fuzzy_config = self.conf.get("fuzzy_trigger_config", {})
+        if not isinstance(fuzzy_config, dict):
+            fuzzy_config = {}
+        self.fuzzy_trigger_enabled = bool(fuzzy_config.get("enabled", False))
+
         # 数据目录
         self.data_dir = StarTools.get_data_dir("astrbot_plugin_big_banana")
         self.refer_images_dir = self.data_dir / "refer_images"
@@ -2787,7 +2792,7 @@ class AIImage(Star):
 
         # 检查命令是否在提示词配置中
         if cmd not in self.prompt_dict:
-            if self._looks_like_fuzzy_image_request(message_str):
+            if self.fuzzy_trigger_enabled and self._looks_like_fuzzy_image_request(message_str):
                 params = self._build_fuzzy_image_params(message_str)
                 logger.info(
                     f"[AI IMAGE] 模糊生图兜底触发，提示词: {params.get('prompt', '')[:80]}"
