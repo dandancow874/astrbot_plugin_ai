@@ -241,7 +241,8 @@ class LegacyBananaImageGenerationTool(FunctionTool[AstrAgentContext]):
                 logger.warning(f"[AI IMAGE] 未找到预设提示词：「{preset_name}」")
                 return f"未找到预设提示词：「{preset_name}」，请使用有效的预设名称。"
             else:
-                params = plugin.prompt_dict.get(preset_name, {})
+                params = plugin.prompt_dict.get(preset_name, {}).copy()
+                params["__trigger_cmd__"] = str(preset_name).strip()
         if prompt:
             params["prompt"] = prompt
             try:

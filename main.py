@@ -764,6 +764,13 @@ class AIImage(Star):
                 mime_type, b64_data = await asyncio.to_thread(read_file, path)
                 if b64_data:
                     results.append((mime_type, b64_data))
+        if tokens:
+            if results:
+                logger.info(
+                    f"[AI IMAGE] 已加载 --id 图片: ids={tokens}, count={len(results)}"
+                )
+            else:
+                logger.warning(f"[AI IMAGE] 未找到 --id 图片: ids={tokens}")
         return results
 
     async def _build_lmp_prompt(
