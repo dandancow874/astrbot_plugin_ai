@@ -25,7 +25,13 @@ from .core.data import (
     PromptConfig,
     ProviderConfig,
 )
-from .core.llm_tools import BigBananaPromptTool, BigBananaTool, remove_tools
+from .core.llm_tools import (
+    AIImageGenerationTool,
+    AIImagePromptTool,
+    BigBananaPromptTool,
+    BigBananaTool,
+    remove_tools,
+)
 from .core.utils import clear_cache, read_file, save_images
 
 # 提示词参数列表
@@ -499,6 +505,10 @@ class BigBanana(Star):
 
         # 检查配置是否启用函数调用工具
         if self.conf.get("llm_tool_settings", {}).get("llm_tool_enabled", False):
+            self.context.add_llm_tools(AIImageGenerationTool(plugin=self))
+            logger.info("已注册函数调用工具: ai_image_generation")
+            self.context.add_llm_tools(AIImagePromptTool(plugin=self))
+            logger.info("已注册函数调用工具: ai_preset_prompt")
             self.context.add_llm_tools(BigBananaTool(plugin=self))
             logger.info("已注册函数调用工具: banana_image_generation")
             self.context.add_llm_tools(BigBananaPromptTool(plugin=self))
@@ -1604,6 +1614,66 @@ class BigBanana(Star):
             or params.get("__trigger_cmd__") == "cf"
         )
 
+    @staticmethod
+    def _looks_like_fuzzy_image_request(text: str) -> bool:
+        text = str(text or "").strip()
+        if not text:
+            return False
+        intent_keywords = (
+            "帮我生成",
+            "生成图片",
+            "生成一张",
+            "生成张",
+            "帮我生",
+            "生图",
+            "画一张",
+            "画张",
+            "做一张",
+            "做张",
+            "出一张",
+            "出张",
+            "改图",
+            "图生图",
+        )
+        if any(keyword in text for keyword in intent_keywords):
+            return True
+        return bool(re.search(r"(生成|制作|设计).{0,12}(海报|头像|图片|画面|封面|主图|转播)", text))
+
+    def _build_fuzzy_image_params(self, message_str: str) -> dict:
+        text = re.sub(r"\[图片\]|\[image\]", "", str(message_str or ""), flags=re.I)
+        text = text.strip()
+        _, parsed_params = self.parsing_prompt_params(f"fuzzy {text}")
+        prompt_text = str(parsed_params.pop("prompt", "") or "").strip()
+
+        params = {
+            "prompt": prompt_text or text,
+            "__trigger_cmd__": "__fuzzy__",
+        }
+        params.update(parsed_params)
+
+        if "aspect_ratio" not in params:
+            ratio_match = re.search(
+                r"(?:比例|画幅|尺寸|ratio|ar)\s*[:：=]?\s*([0-9]+(?:\.[0-9]+)?\s*[:：/]\s*[0-9]+(?:\.[0-9]+)?)",
+                text,
+                flags=re.I,
+            )
+            if ratio_match:
+                params["aspect_ratio"] = (
+                    ratio_match.group(1)
+                    .replace("：", ":")
+                    .replace("/", ":")
+                    .replace(" ", "")
+                )
+                params["__user_overrode_aspect_ratio__"] = True
+
+        params["__user_overrode_model__"] = "model" in params
+        params["__user_overrode_image_size__"] = "image_size" in params
+        params["__user_overrode_aspect_ratio__"] = bool(
+            params.get("__user_overrode_aspect_ratio__")
+            or "aspect_ratio" in params
+        )
+        return params
+
     def parsing_prompt_params(self, prompt: str) -> tuple[list[str], dict]:
         """解析提示词中的参数，若没有指定参数则使用默认值填充。必须是包括命令和参数的完整提示词"""
 
@@ -2663,6 +2733,13 @@ class BigBanana(Star):
 
         # 检查命令是否在提示词配置中
         if cmd not in self.prompt_dict:
+            if self._looks_like_fuzzy_image_request(message_str):
+                params = self._build_fuzzy_image_params(message_str)
+                logger.info(
+                    f"[BIG BANANA] 模糊生图兜底触发，提示词: {params.get('prompt', '')[:80]}"
+                )
+                await self._run_job_with_limit(event, params)
+                event.stop_event()
             return
 
         # 群白名单判断

@@ -18,7 +18,12 @@ from astrbot.core.platform.astr_message_event import AstrMessageEvent
 
 from .utils import clear_cache
 
-TOOLS_NAMESPACE = ["banana_preset_prompt", "banana_image_generation"]
+TOOLS_NAMESPACE = [
+    "banana_preset_prompt",
+    "banana_image_generation",
+    "ai_preset_prompt",
+    "ai_image_generation",
+]
 
 if TYPE_CHECKING:
     from ..main import BigBanana
@@ -117,6 +122,15 @@ class BigBananaPromptTool(FunctionTool[AstrAgentContext]):
             return f"预设提示词「{get_preset_prompt}」内容如下：\n{preset_prompt}"
         logger.warning("[BIG BANANA] get_preset_prompt 参数不能为空")
         return "get_preset_prompt 参数不能为空，请提供有效的预设名称。"
+
+
+@dataclass
+class AIImagePromptTool(BigBananaPromptTool):
+    name: str = "ai_preset_prompt"
+    description: str = (
+        "This is a helper tool for the ai_image_generation tool. "
+        "It retrieves preset prompts so the final prompt can be refined before image generation."
+    )
 
 
 @dataclass
@@ -302,6 +316,15 @@ class BigBananaTool(FunctionTool[AstrAgentContext]):
         #     )
         # logger.info("[BIG BANANA] 图片生成成功，返回图片内容")
         # return CallToolResult(content=contents)
+
+
+@dataclass
+class AIImageGenerationTool(BigBananaTool):
+    name: str = "ai_image_generation"
+    description: str = (
+        "Use this tool whenever the user asks ai生图 / astrbot_plugin_ai to generate, create, draw, make, edit, or transform an image. "
+        "It supports text-to-image and reference-image editing. Use saved image ids from lmd via the image_id parameter."
+    )
 
 
 def remove_tools(context: Context):
