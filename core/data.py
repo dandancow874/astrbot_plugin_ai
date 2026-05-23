@@ -10,7 +10,7 @@ DEF_VERTEX_AI_ANONYMOUS_BASE_API = "https://cloudconsole-pa.clients6.google.com"
 # 类型枚举
 _API_Type = Literal[
     "Gemini", "OpenAI_Chat", "OpenAI_Images", "Vertex_AI_Anonymous", "RH_Provider",
-    "Grsai_GPT_Image", "ComfyUI"
+    "Grsai_GPT_Image", "Grsai_GPT_Image_VIP", "ComfyUI"
 ]
 
 

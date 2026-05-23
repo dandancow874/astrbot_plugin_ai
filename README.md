@@ -41,6 +41,15 @@ gpt 猫猫海报
 gpt [图片] 把衣服换成蓝色
 ```
 
+GPT Image 2 VIP 会在 `gpt` 命令指定 2K/4K 时自动启用：
+
+```
+gpt 电影海报 --size 2k
+gpt [图片] 重绘为高清商业海报 --size 4k
+```
+
+VIP 使用单独的 `gpt_image_vip_config` 配置和白名单。`--size` 是 `--image_size` 的别名；不写 `--size 2k/4k` 时仍走普通 GPT Image。
+
 ### Midjourney 使用说明
 
 | 触发词 | 模式 | 说明 |

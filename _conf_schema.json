@@ -308,6 +308,77 @@
             }
         }
     },
+    "gpt_image_vip_config": {
+        "description": "💎 GPT Image 2 VIP 模型配置 (grsai)",
+        "type": "object",
+        "hint": "当 gpt 命令使用 --size 2K 或 --size 4K 时，会自动切换到 gpt-image-2-vip。接口参考 /v1/api/generate。",
+        "items": {
+            "enabled": {
+                "description": "启用",
+                "type": "bool",
+                "default": true
+            },
+            "whitelist": {
+                "description": "VIP 白名单配置",
+                "type": "object",
+                "hint": "只限制 gpt-image-2-vip。关闭白名单时所有允许使用插件的用户都可用 VIP。",
+                "items": {
+                    "enabled": {
+                        "description": "启用群组白名单",
+                        "type": "bool",
+                        "default": false,
+                        "hint": "开启后，只有白名单群组可以使用 gpt-image-2-vip。"
+                    },
+                    "whitelist": {
+                        "description": "群组UMO白名单",
+                        "type": "list",
+                        "default": [],
+                        "hint": "白名单群组UMO列表，可在对应群内使用/sid获取。要把UMO写完整。"
+                    },
+                    "user_enabled": {
+                        "description": "启用用户白名单",
+                        "type": "bool",
+                        "default": false,
+                        "hint": "开启后，只有白名单用户可以使用 gpt-image-2-vip。"
+                    },
+                    "user_whitelist": {
+                        "description": "用户ID白名单",
+                        "type": "list",
+                        "default": [],
+                        "hint": "用户QQ号列表"
+                    }
+                }
+            },
+            "primary": {
+                "description": "主提供商 (grsai VIP)",
+                "type": "object",
+                "items": {
+                    "api_url": {
+                        "description": "grsai VIP API 地址",
+                        "type": "string",
+                        "default": "https://grsaiapi.com",
+                        "hint": "填 Host 地址。文档示例：https://grsaiapi.com 或 https://grsai.dakka.com.cn，不要填 /v1/api/generate。"
+                    },
+                    "api_key": {
+                        "description": "API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "直接粘贴 grsai API Key。多个 Key 可用英文逗号或换行分隔。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
+                    }
+                }
+            }
+        }
+    },
     "Image-to-Prompt": {
         "description": "🧪 Image-to-Prompt 模型配置",
         "type": "object",
@@ -434,6 +505,7 @@
                             "OpenAI_Images",
                             "Vertex_AI_Anonymous",
                             "Grsai_GPT_Image",
+                            "Grsai_GPT_Image_VIP",
                             "ComfyUI"
                         ],
                         "default": "Gemini"
@@ -527,7 +599,7 @@
                     "4K"
                 ],
                 "default": "1K",
-                "hint": "生成图片的分辨率，必须是大写的K。当前仅对Gemini规范的 gemini-3 模型有效"
+                "hint": "生成图片的分辨率，可用 --image_size 2K 或 --size 2k。gpt 命令使用 --size 2k/4k 时会自动切换到 GPT Image 2 VIP。"
             },
             "google_search": {
                 "description": "是否启用谷歌搜索工具",

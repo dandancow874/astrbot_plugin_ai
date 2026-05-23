@@ -431,3 +431,169 @@ class GrsaiGPTImageProvider(BaseProvider):
             image_b64_list=image_b64_list,
             params=params,
         )
+
+
+class GrsaiGPTImageVIPProvider(GrsaiGPTImageProvider):
+    """Grsai GPT Image VIP 提供商（/v1/api/generate）。"""
+
+    api_type: str = "Grsai_GPT_Image_VIP"
+
+    @staticmethod
+    def _resolve_generate_url(api_url: str) -> str:
+        raw = (api_url or "").strip().rstrip("/")
+        lowered = raw.lower()
+        root = raw
+        if "/v1/" in lowered:
+            root = raw.split("/v1/", 1)[0]
+        elif lowered.endswith("/v1"):
+            root = raw[: -len("/v1")]
+        return root.rstrip("/") + "/v1/api/generate"
+
+    @staticmethod
+    def _round8(value: float) -> int:
+        return max(64, int(round(value / 8) * 8))
+
+    @classmethod
+    def _resolve_vip_aspect_ratio(
+        cls,
+        aspect_ratio: object,
+        image_size: object,
+        image_b64_list: list[tuple[str, str]],
+    ) -> str:
+        size_text = str(image_size or "").strip().upper()
+        long_edge = 1024
+        if size_text == "2K":
+            long_edge = 2048
+        elif size_text == "4K":
+            long_edge = 4096
+
+        ratio_text = cls._resolve_payload_size(aspect_ratio, image_b64_list)
+        try:
+            left, right = ratio_text.split(":", 1)
+            ratio = float(left) / float(right)
+        except Exception:
+            ratio = 1.0
+
+        if ratio >= 1:
+            width = long_edge
+            height = cls._round8(long_edge / ratio)
+        else:
+            width = cls._round8(long_edge * ratio)
+            height = long_edge
+        return f"{width}x{height}"
+
+    async def _call_api(
+        self,
+        provider_config: ProviderConfig,
+        api_key: str,
+        image_b64_list: list[tuple[str, str]],
+        params: dict,
+    ) -> tuple[list[tuple[str, str]] | None, int | None, str | None]:
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        model = (params.get("model") or provider_config.model or "gpt-image-2-vip").strip()
+        prompt = params.get("prompt", "anything")
+        urls = params.get("__source_image_urls__")
+        if not isinstance(urls, list):
+            urls = []
+        urls = [u.strip() for u in urls if isinstance(u, str) and u.strip()]
+        image_data_urls = self._build_data_urls(image_b64_list)
+        images = image_data_urls or urls
+
+        aspect_ratio = self._resolve_vip_aspect_ratio(
+            params.get("aspect_ratio"), params.get("image_size"), image_b64_list
+        )
+        payload: dict = {
+            "model": model,
+            "prompt": prompt,
+            "images": images,
+            "aspectRatio": aspect_ratio,
+            "replyType": "json",
+        }
+        logger.info(
+            f"[GPT Image VIP] request aspectRatio={aspect_ratio}, image_size={params.get('image_size')}, reference_images={len(images)}"
+        )
+
+        generate_url = self._resolve_generate_url(provider_config.api_url)
+        try:
+            impersonate = (
+                provider_config.impersonate.strip()
+                if isinstance(provider_config.impersonate, str)
+                and provider_config.impersonate.strip()
+                else None
+            )
+            verify = (
+                provider_config.tls_verify
+                if isinstance(provider_config.tls_verify, bool)
+                else True
+            )
+            req_kwargs = {
+                "timeout": self.def_common_config.timeout,
+                "proxy": self.def_common_config.proxy,
+                "verify": verify,
+            }
+            if impersonate:
+                req_kwargs["impersonate"] = impersonate
+            if CurlHttpVersion is not None:
+                req_kwargs["http_version"] = CurlHttpVersion.V1_1
+
+            response = await self.session.post(
+                url=generate_url,
+                headers=headers,
+                json=payload,
+                **req_kwargs,
+            )
+            resp_text = getattr(response, "text", "")
+            if response.status_code != 200:
+                detail = self._extract_error_message(
+                    resp_text if isinstance(resp_text, str) else ""
+                )
+                return (
+                    None,
+                    response.status_code,
+                    f"图片生成失败: {detail}"
+                    if detail
+                    else f"图片生成失败: 状态码 {response.status_code}",
+                )
+
+            try:
+                data = json.loads(resp_text) if isinstance(resp_text, str) else {}
+            except Exception:
+                data = {}
+            if not isinstance(data, dict):
+                return None, 200, "响应内容格式错误"
+
+            if data.get("status") not in (None, "succeeded"):
+                reason = data.get("failure_reason") or data.get("message") or data.get("status")
+                return None, 400, f"图片生成失败: {reason}"
+
+            result_url_list: list[str] = []
+            results = data.get("results")
+            if isinstance(results, list):
+                for item in results:
+                    if isinstance(item, dict):
+                        u = item.get("url")
+                        if isinstance(u, str) and u.strip():
+                            result_url_list.append(u.strip())
+            url = data.get("url")
+            if isinstance(url, str) and url.strip():
+                result_url_list.append(url.strip())
+
+            if not result_url_list:
+                return None, 200, "响应中未包含图片数据"
+
+            result_url_list = list(dict.fromkeys(result_url_list))
+            b64_images = await self.downloader.fetch_media(result_url_list)
+            b64_images = [(mime, b64) for mime, b64 in b64_images if b64]
+            if not b64_images:
+                return None, 200, "图片下载失败"
+            return b64_images, 200, None
+        except Timeout as e:
+            logger.error(f"[GPT Image VIP] 网络请求超时: {e}")
+            return None, 408, "图片生成失败：响应超时"
+        except Exception as e:
+            err_text = str(e)
+            logger.error(f"[GPT Image VIP] 请求错误: {err_text}, url={generate_url}")
+            return None, 500, f"图片生成失败：请求错误: {err_text}"

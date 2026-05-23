@@ -58,6 +58,7 @@ PARAMS_ALIAS_MAP = {
     "ar": "aspect_ratio",
     "r": "aspect_ratio",
     "ps": "preset",
+    "size": "image_size",
     "头像": "avatar",
 }
 
@@ -450,6 +451,21 @@ class AIImage(Star):
             nanobanana_whitelist.get("user_enabled", False)
         )
         self.nanobanana_user_whitelist = nanobanana_whitelist.get("user_whitelist", [])
+
+        gpt_vip_conf = self.conf.get("gpt_image_vip_config", {})
+        if not isinstance(gpt_vip_conf, dict):
+            gpt_vip_conf = {}
+        gpt_vip_whitelist = gpt_vip_conf.get("whitelist", {})
+        if not isinstance(gpt_vip_whitelist, dict):
+            gpt_vip_whitelist = {}
+        self.gpt_vip_group_whitelist_enabled = bool(
+            gpt_vip_whitelist.get("enabled", False)
+        )
+        self.gpt_vip_group_whitelist = gpt_vip_whitelist.get("whitelist", [])
+        self.gpt_vip_user_whitelist_enabled = bool(
+            gpt_vip_whitelist.get("user_enabled", False)
+        )
+        self.gpt_vip_user_whitelist = gpt_vip_whitelist.get("user_whitelist", [])
 
         # 前缀配置
         prefix_config = self.conf.get("prefix_config", {})
@@ -1362,6 +1378,21 @@ class AIImage(Star):
             insert_index=7,
         )
         upsert_fixed_model(
+            conf_key="gpt_image_vip_config",
+            name="GPT-Image-2-VIP",
+            default_triggers=["gptvip"],
+            default_provider_stub={
+                "name": "GPT Image VIP账号",
+                "enabled": True,
+                "api_type": "Grsai_GPT_Image_VIP",
+                "keys": [],
+                "api_url": "https://grsaiapi.com",
+                "model": "gpt-image-2-vip",
+                "stream": False,
+            },
+            insert_index=8,
+        )
+        upsert_fixed_model(
             conf_key="comfyui_config",
             name="ComfyUI",
             default_triggers=["cf"],
@@ -1374,7 +1405,7 @@ class AIImage(Star):
                 "model": "",
                 "stream": False,
             },
-            insert_index=8,
+            insert_index=9,
         )
 
         if updated_models:
@@ -1758,6 +1789,8 @@ class AIImage(Star):
                                 .replace("/", ":")
                                 .replace("\\", ":")
                             )
+                        if key == "image_size":
+                            value = value.strip("`'\" \t\r\n,，;；。.!！?？)）]】}、").upper()
                         params[key] = value
                     remove_spans.append((span_start, span_end))
                     index += 1
@@ -2033,7 +2066,14 @@ class AIImage(Star):
 
         # Validate Type
         # Note: Should match _API_Type literal
-        valid_types = ["Gemini", "OpenAI_Chat", "OpenAI_Images", "Vertex_AI_Anonymous"]
+        valid_types = [
+            "Gemini",
+            "OpenAI_Chat",
+            "OpenAI_Images",
+            "Vertex_AI_Anonymous",
+            "Grsai_GPT_Image",
+            "Grsai_GPT_Image_VIP",
+        ]
         # Case insensitive match
         api_type_match = next(
             (t for t in valid_types if t.lower() == api_type.lower()), None
@@ -2875,6 +2915,16 @@ class AIImage(Star):
             ):
                 params.setdefault("model", selected_model)
 
+        if (
+            cmd == "gpt"
+            and str(params.get("image_size", "") or "").strip().upper() in {"2K", "4K"}
+        ):
+            params["__model_name__"] = "GPT-Image-2-VIP"
+            params["model"] = "gpt-image-2-vip"
+            logger.info(
+                f"[AI IMAGE] gpt --size {params.get('image_size')} 自动切换到 GPT-Image-2-VIP"
+            )
+
         # 处理预设提示词补充参数preset_append
         if (
             params.get("preset_append", self.common_config.preset_append)
@@ -2987,6 +3037,30 @@ class AIImage(Star):
                 logger.info(
                     f"用户 {event.get_sender_id()} 不在 nano-banana 白名单内，跳过处理"
                 )
+                return
+
+        is_gpt_image_vip = (
+            params.get("__model_name__") == "GPT-Image-2-VIP"
+            or str(params.get("model", "") or "").strip() == "gpt-image-2-vip"
+        )
+        if is_gpt_image_vip:
+            if (
+                self.gpt_vip_group_whitelist_enabled
+                and event.unified_msg_origin not in self.gpt_vip_group_whitelist
+            ):
+                logger.info(
+                    f"群 {event.unified_msg_origin} 不在 GPT Image VIP 白名单内，跳过处理"
+                )
+                yield event.plain_result("❌ 当前群不在 GPT Image VIP 白名单内。")
+                return
+            if (
+                self.gpt_vip_user_whitelist_enabled
+                and event.get_sender_id() not in self.gpt_vip_user_whitelist
+            ):
+                logger.info(
+                    f"用户 {event.get_sender_id()} 不在 GPT Image VIP 白名单内，跳过处理"
+                )
+                yield event.plain_result("❌ 你不在 GPT Image VIP 白名单内。")
                 return
 
         if cmd == "反推":
@@ -3588,6 +3662,12 @@ class AIImage(Star):
             or not target_model.providers
         ):
             return None, "ComfyUI 环境没有启用，请在插件设置里启用 comfyui_config，并确认 ComfyUI 服务已启动。"
+        if model_name == "GPT-Image-2-VIP" and (
+            not target_model
+            or not target_model.enabled
+            or not target_model.providers
+        ):
+            return None, "GPT Image 2 VIP 没有启用，请在插件设置里启用 gpt_image_vip_config 并配置 API Key。"
 
         # 如果未找到指定模型（或未指定），使用第一个启用的模型作为默认
         if not target_model and self.models:
