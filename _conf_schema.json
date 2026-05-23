@@ -26,7 +26,7 @@
     "nanobanana_config": {
         "description": "🍌 nano-banana 模型配置",
         "type": "object",
-        "hint": "bt1,bt2,bt3 (nano-banana-2) 和 bp1,bp2,bp3 (nano-banana-pro) 会使用这里配置的 URL 与 API Key。RH 供应商优先使用。",
+        "hint": "bt 会按有图/无图自动沿用 bt2/bt1 参数；旧 bt1,bt2,bt3 仍兼容。bp 同理沿用 bp2/bp1。RH 供应商优先使用。",
         "items": {
             "enabled": {
                 "description": "启用",
@@ -67,7 +67,7 @@
             "rh_provider": {
                 "description": "🔌 RH 供应商配置（优先使用）",
                 "type": "object",
-                "hint": "RH 供应商只需配置 API Key。bt1,bt2,bt3 使用 nano-banana-2 模型，bp1,bp2,bp3 使用 nano-banana-pro 模型。",
+                "hint": "RH 供应商只需配置 API Key。bt/bt1/bt2/bt3 使用 nano-banana-2 模型，bp/bp1/bp2/bp3 使用 nano-banana-pro 模型。",
                 "items": {
                     "enabled": {
                         "description": "启用",
@@ -229,7 +229,7 @@
     "grok_config": {
         "description": "🤖 Grok 模型配置",
         "type": "object",
-        "hint": "gp1, gp2 会使用这里配置的 URL 与 API Key。",
+        "hint": "gp 会按有图/无图自动沿用 gp2/gp1 参数；旧 gp1, gp2 仍兼容。",
         "items": {
             "enabled": {
                 "description": "启用",
@@ -271,7 +271,7 @@
     "gpt_image_config": {
         "description": "🎨 GPT Image 2.1 模型配置 (grsai)",
         "type": "object",
-        "hint": "gpt1 (文生图) 和 gpt2 (图生图) 会使用这里配置的 grsai URL 与 API Key。",
+        "hint": "gpt 会按有图/无图自动沿用 gpt2/gpt1 参数；旧 gpt1 (文生图) 和 gpt2 (图生图) 仍兼容。",
         "items": {
             "enabled": {
                 "description": "启用",
@@ -484,7 +484,7 @@
                 "description": "最小输入图片数量",
                 "type": "int",
                 "default": 1,
-                "hint": "如果消息携带的图片数量少于这个值，将自动添加At对象头像（At多个用户则可能添加多张，直到达到上限），如果仍然不够，继续添加发送者头像（仅Aiocqhttp），数量仍然不够将返回错误信息。"
+                "hint": "如果参考图片数量少于这个值，将返回错误信息。@ 群友头像必须显式使用 --头像，QQ 头像可使用 --q。"
             },
             "max_images": {
                 "description": "最大输入图片数量",

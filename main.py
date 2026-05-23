@@ -28,8 +28,6 @@ from .core.data import (
 from .core.llm_tools import (
     AIImageGenerationTool,
     AIImagePromptTool,
-    BigBananaPromptTool,
-    BigBananaTool,
     remove_tools,
 )
 from .core.utils import clear_cache, read_file, save_images
@@ -93,7 +91,7 @@ MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 MAX_SIZE_B64_LEN = int(MAX_SIZE_BYTES * 4 / 3)
 
 
-class BigBanana(Star):
+class AIImage(Star):
     MAX_CONCURRENT_JOBS = 8
 
     @staticmethod
@@ -377,7 +375,7 @@ class BigBanana(Star):
                 result = response.json()
             except json.JSONDecodeError as e:
                 logger.error(
-                    f"[BIG BANANA] Image-to-Prompt JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{response.text[:1024]}"
+                    f"[AI IMAGE] Image-to-Prompt JSON反序列化错误: {e}，状态码：{response.status_code}，响应内容：{response.text[:1024]}"
                 )
                 return "❌ 反推失败：响应内容格式错误"
             if response.status_code != 200:
@@ -389,7 +387,7 @@ class BigBanana(Star):
                     if not msg and isinstance(err, dict):
                         msg = err.get("message")
                 logger.error(
-                    f"[BIG BANANA] Image-to-Prompt 失败，状态码: {response.status_code}, 响应内容: {response.text[:1024]}"
+                    f"[AI IMAGE] Image-to-Prompt 失败，状态码: {response.status_code}, 响应内容: {response.text[:1024]}"
                 )
                 return f"❌ 反推失败：{msg or f'状态码 {response.status_code}'}"
 
@@ -412,7 +410,7 @@ class BigBanana(Star):
                 return "❌ 反推失败：响应缺少内容"
             return content.strip()
         except Exception as e:
-            logger.error(f"[BIG BANANA] Image-to-Prompt 请求错误: {e}", exc_info=True)
+            logger.error(f"[AI IMAGE] Image-to-Prompt 请求错误: {e}", exc_info=True)
             return "❌ 反推失败：请求错误"
 
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -509,10 +507,6 @@ class BigBanana(Star):
             logger.info("已注册函数调用工具: ai_image_generation")
             self.context.add_llm_tools(AIImagePromptTool(plugin=self))
             logger.info("已注册函数调用工具: ai_preset_prompt")
-            self.context.add_llm_tools(BigBananaTool(plugin=self))
-            logger.info("已注册函数调用工具: banana_image_generation")
-            self.context.add_llm_tools(BigBananaPromptTool(plugin=self))
-            logger.info("已注册函数调用工具: banana_preset_prompt")
 
     def _export_prompt_presets_txt(self):
         try:
@@ -1215,7 +1209,7 @@ class BigBanana(Star):
                 target.update(new_data)
                 updated_models = True
 
-        # nano-banana-2 模型 (bt1, bt2, bt3)
+        # nano-banana-2 模型 (bt 简化触发词 + 旧 bt1/bt2/bt3)
         nanobanana_conf = self.conf.get("nanobanana_config", {})
         if not isinstance(nanobanana_conf, dict):
             nanobanana_conf = {}
@@ -1225,7 +1219,7 @@ class BigBanana(Star):
         nano_2_providers = build_nano_banana_providers(nanobanana_conf, "nano-banana-2")
         nano_2_data = {
             "name": "nano-banana-2",
-            "triggers": ["bt2", "bt1", "bt3"],
+            "triggers": ["bt", "bt2", "bt1", "bt3"],
             "providers": nano_2_providers,
             "enabled": nanobanana_enabled,
         }
@@ -1254,7 +1248,7 @@ class BigBanana(Star):
         )
         nano_pro_data = {
             "name": "nano-banana",
-            "triggers": ["bp2", "bp1", "bp3"],
+            "triggers": ["bp", "bp2", "bp1", "bp3"],
             "providers": nano_pro_providers,
             "enabled": nanobanana_enabled,
         }
@@ -1310,7 +1304,7 @@ class BigBanana(Star):
         upsert_fixed_model(
             conf_key="midjourney_config",
             name="Midjourney-V7",
-            default_triggers=["mj1", "mj2"],
+            default_triggers=["mj", "mj1", "mj2"],
             default_provider_stub={
                 "name": "Midjourney账号",
                 "enabled": True,
@@ -1325,7 +1319,7 @@ class BigBanana(Star):
         upsert_fixed_model(
             conf_key="midjourney_config",
             name="Midjourney-Niji7",
-            default_triggers=["nj1", "nj2"],
+            default_triggers=["nj", "nj1", "nj2"],
             default_provider_stub={
                 "name": "Midjourney账号",
                 "enabled": True,
@@ -1340,7 +1334,7 @@ class BigBanana(Star):
         upsert_fixed_model(
             conf_key="grok_config",
             name="Grok",
-            default_triggers=["gp1", "gp2"],
+            default_triggers=["gp", "gp1", "gp2"],
             default_provider_stub={
                 "name": "Grok账号",
                 "enabled": True,
@@ -1355,7 +1349,7 @@ class BigBanana(Star):
         upsert_fixed_model(
             conf_key="gpt_image_config",
             name="GPT-Image-2",
-            default_triggers=["gpt1", "gpt2"],
+            default_triggers=["gpt", "gpt1", "gpt2"],
             default_provider_stub={
                 "name": "GPT Image账号",
                 "enabled": True,
@@ -1495,7 +1489,7 @@ class BigBanana(Star):
                     self.prompt_list.append(prompt_line)
                 updated_prompts = True
                 logger.info(
-                    f"[BIG BANANA] 更新预设: {trigger}, model={params.get('model')}"
+                    f"[AI IMAGE] 更新预设: {trigger}, model={params.get('model')}"
                 )
             elif trigger not in existing_cmds:
                 # 添加新预设
@@ -1526,7 +1520,7 @@ class BigBanana(Star):
             self._save_prompt_config_and_backup()
 
     def _reserved_prompt_triggers(self) -> set[str]:
-        reserved = {"gp1", "gp2", "gpt1", "gpt2", "cf"}
+        reserved = {"gp", "gp1", "gp2", "gpt", "gpt1", "gpt2", "cf"}
         if hasattr(self, "models"):
             for model in self.models:
                 for trigger in getattr(model, "triggers", []) or []:
@@ -1613,6 +1607,26 @@ class BigBanana(Star):
             params.get("__model_name__") == "ComfyUI"
             or params.get("__trigger_cmd__") == "cf"
         )
+
+    @staticmethod
+    def _legacy_mode_trigger(trigger: object, prefer_i2i: bool) -> str:
+        trigger_text = str(trigger or "").strip()
+        mapping = {
+            "gpt": ("gpt1", "gpt2"),
+            "gp": ("gp1", "gp2"),
+            "bp": ("bp1", "bp2"),
+            "bt": ("bt1", "bt2"),
+            "mj": ("mj1", "mj2"),
+            "nj": ("nj1", "nj2"),
+        }
+        if trigger_text in mapping:
+            t2i, i2i = mapping[trigger_text]
+            return i2i if prefer_i2i else t2i
+        return trigger_text
+
+    @staticmethod
+    def _is_simplified_image_trigger(trigger: object) -> bool:
+        return str(trigger or "").strip() in {"gpt", "gp", "bp", "bt", "mj", "nj"}
 
     @staticmethod
     def _looks_like_fuzzy_image_request(text: str) -> bool:
@@ -2736,9 +2750,40 @@ class BigBanana(Star):
             if self._looks_like_fuzzy_image_request(message_str):
                 params = self._build_fuzzy_image_params(message_str)
                 logger.info(
-                    f"[BIG BANANA] 模糊生图兜底触发，提示词: {params.get('prompt', '')[:80]}"
+                    f"[AI IMAGE] 模糊生图兜底触发，提示词: {params.get('prompt', '')[:80]}"
                 )
-                await self._run_job_with_limit(event, params)
+                task_id = event.message_obj.message_id
+                task_temp_dir = self.temp_dir / str(task_id)
+                os.makedirs(task_temp_dir, exist_ok=True)
+                try:
+                    results, err_msg = await self._run_job_with_limit(event, params)
+                    if not results or err_msg:
+                        err_text = (
+                            err_msg.strip()
+                            if isinstance(err_msg, str) and err_msg.strip()
+                            else "图片生成失败，未返回任何结果。"
+                        )
+                        yield event.chain_result(
+                            [
+                                Comp.Reply(id=event.message_obj.message_id),
+                                Comp.Plain(f"❌ 图片生成失败：{err_text}"),
+                            ]
+                        )
+                    else:
+                        if (
+                            self._is_comfyui_params(params)
+                            and event.platform_meta.name == "aiocqhttp"
+                        ):
+                            msg_chain = self.build_comfyui_forward_chain(
+                                event, params, results, task_temp_dir
+                            )
+                        else:
+                            msg_chain = self.build_message_chain(
+                                event, results, task_temp_dir
+                            )
+                        yield event.chain_result(msg_chain)
+                finally:
+                    clear_cache(task_temp_dir)
                 event.stop_event()
             return
 
@@ -2815,7 +2860,7 @@ class BigBanana(Star):
             params.update(selected_params)
             params.update({k: v for k, v in user_params.items() if k != "prompt"})
             logger.info(
-                f"[BIG BANANA] 合并后参数: aspect_ratio={params.get('aspect_ratio')}, model={params.get('model')}"
+                f"[AI IMAGE] 合并后参数: aspect_ratio={params.get('aspect_ratio')}, model={params.get('model')}"
             )
             params["prompt"] = final_prompt
         else:
@@ -3142,8 +3187,8 @@ class BigBanana(Star):
                 ):
                     skipped_at_qq = True
                     continue
-                # --头像 可让预设/文生图显式使用 @ 群友头像；图生图触发词保留旧行为。
-                if use_at_avatar or is_i2i_mode:
+                # 只有显式 --头像 时，才把 @ 群友头像作为参考图。
+                if use_at_avatar:
                     avatar_image_urls.append(
                         f"https://q.qlogo.cn/g?b=qq&s=0&nk={comp.qq}"
                     )
@@ -3175,30 +3220,8 @@ class BigBanana(Star):
                             f"https://q.qlogo.cn/g?b=qq&s=0&nk={target_id}"
                         )
 
-        if (
-            is_i2i_mode
-            and not avatar_image_urls
-            and not direct_image_urls
-            and not params.get("refer_images")
-            and event.platform_meta.name == "aiocqhttp"
-        ):
-            avatar_image_urls.append(
-                f"https://q.qlogo.cn/g?b=qq&s=0&nk={event.get_sender_id()}"
-            )
-
         min_required_images = params.get("min_images", self.prompt_config.min_images)
         max_allowed_images = params.get("max_images", self.prompt_config.max_images)
-        # 如果图片数量不满足最小要求，且消息平台是Aiocqhttp，取消息发送者头像作为参考图片
-        # 只有图生图模式才添加头像
-        if (
-            len(avatar_image_urls) + len(direct_image_urls) < min_required_images
-            and int(min_required_images or 0) >= 1
-            and is_i2i_mode
-            and event.platform_meta.name == "aiocqhttp"
-        ):
-            avatar_image_urls.append(
-                f"https://q.qlogo.cn/g?b=qq&s=0&nk={event.get_sender_id()}"
-            )
 
         # 图片b64列表，每个元素是 (mime_type, b64_data) 元组
         image_b64_list = []
@@ -3598,22 +3621,25 @@ class BigBanana(Star):
         if not target_model:
             return None, "未配置任何模型。"
 
-        # 如果是通过默认模型 / 模型切换选中的模型，沿用该模型触发词的默认参数。
-        # 例如 GPT-Image-2 的 gpt1/gpt2 里定义了文生图 9:16、图生图 auto。
+        # 如果是通过默认模型 / 模型切换 / 简化触发词选中的模型，沿用 1/2 触发词的默认参数。
+        # 例如 GPT-Image-2：无图沿用 gpt1 的 9:16，带图沿用 gpt2 的 auto。
         trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
-        if trigger_cmd not in set(target_model.triggers or []):
-            prefer_i2i = bool(image_b64_list)
+        prefer_i2i = bool(image_b64_list)
+        if trigger_cmd not in set(target_model.triggers or []) or self._is_simplified_image_trigger(trigger_cmd):
             selected_trigger = ""
-            for trigger in target_model.triggers or []:
-                trigger_text = str(trigger).strip()
-                if not trigger_text:
-                    continue
-                if prefer_i2i and trigger_text.endswith("2"):
-                    selected_trigger = trigger_text
-                    break
-                if not prefer_i2i and not trigger_text.endswith("2"):
-                    selected_trigger = trigger_text
-                    break
+            if self._is_simplified_image_trigger(trigger_cmd):
+                selected_trigger = self._legacy_mode_trigger(trigger_cmd, prefer_i2i)
+            if not selected_trigger:
+                for trigger in target_model.triggers or []:
+                    trigger_text = str(trigger).strip()
+                    if not trigger_text or self._is_simplified_image_trigger(trigger_text):
+                        continue
+                    if prefer_i2i and trigger_text.endswith("2"):
+                        selected_trigger = trigger_text
+                        break
+                    if not prefer_i2i and not trigger_text.endswith("2"):
+                        selected_trigger = trigger_text
+                        break
             if not selected_trigger and target_model.triggers:
                 selected_trigger = str(target_model.triggers[0]).strip()
 
@@ -3631,7 +3657,7 @@ class BigBanana(Star):
                     params.setdefault(key, value)
                 if selected_trigger:
                     logger.info(
-                        f"[BIG BANANA] 默认模型沿用触发词参数: model={target_model.name}, trigger={selected_trigger}, aspect_ratio={params.get('aspect_ratio')}"
+                        f"[AI IMAGE] 默认模型沿用触发词参数: model={target_model.name}, trigger={selected_trigger}, aspect_ratio={params.get('aspect_ratio')}"
                     )
 
         # 2. 获取该模型的提供商列表
@@ -3692,7 +3718,7 @@ class BigBanana(Star):
             params_model = str(params.get("model", "") or "").strip()
 
             logger.info(
-                f"[BIG BANANA] Dispatch check: type={provider.api_type}, url={provider.api_url}, params_model={params_model}, provider_model={provider_model}"
+                f"[AI IMAGE] Dispatch check: type={provider.api_type}, url={provider.api_url}, params_model={params_model}, provider_model={provider_model}"
             )
 
             if provider.api_type == "OpenAI_Chat" and (
@@ -3708,7 +3734,7 @@ class BigBanana(Star):
                         # 如果需要隔离，应该 copy。但这里我们希望这个默认值生效。
                         call_params["image_size"] = "2K"
                         logger.info(
-                            f"[BIG BANANA] 为 nano-banana-pro 强制设置默认分辨率: 2K"
+                            f"[AI IMAGE] 为 nano-banana-pro 强制设置默认分辨率: 2K"
                         )
 
             images_result, err = await self.provider_map[

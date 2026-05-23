@@ -5,4 +5,4 @@ version: v0.2.4
 author: dandancow874
 repo: https://github.com/dandancow874/astrbot_plugin_ai
 
-class_name: BigBanana
+class_name: AIImage
