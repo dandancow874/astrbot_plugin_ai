@@ -1547,6 +1547,32 @@ class BigBanana(Star):
                 details.append(f"{key}: {params[key]}")
         return "\n".join(details)
 
+    async def _load_prompt_detail_images(
+        self, trigger_word: str
+    ) -> list[tuple[str, str]]:
+        trigger_word = self._clean_command_text(trigger_word).split(maxsplit=1)[0].strip()
+        params = self.prompt_dict.get(trigger_word, {})
+        if not isinstance(params, dict):
+            return []
+
+        images: list[tuple[str, str]] = []
+        refer_images = params.get("refer_images")
+        if refer_images:
+            for filename in str(refer_images).split(","):
+                filename = filename.strip()
+                if not filename:
+                    continue
+                mime_type, b64_data = await asyncio.to_thread(
+                    read_file, self.refer_images_dir / filename
+                )
+                if b64_data:
+                    images.append((mime_type, b64_data))
+
+        id_images = await self._load_id_images(params.get("id"))
+        if id_images:
+            images.extend(id_images)
+        return images
+
     @staticmethod
     def _clean_command_text(text: object) -> str:
         cleaned = str(text or "")
@@ -2355,6 +2381,7 @@ class BigBanana(Star):
             return
 
         details_text = self._format_prompt_details(trigger_word)
+        detail_images = await self._load_prompt_detail_images(trigger_word)
         if event.platform_meta.name == "aiocqhttp":
             from astrbot.api.message_components import Node, Nodes, Plain
 
@@ -2365,9 +2392,25 @@ class BigBanana(Star):
                     content=[Plain(details_text)],
                 )
             ]
+            if detail_images:
+                nodes.append(
+                    Node(
+                        uin=event.get_sender_id(),
+                        name=event.get_sender_name(),
+                        content=[
+                            Plain(f"参考图（{len(detail_images)} 张）"),
+                            *[
+                                Comp.Image.fromBase64(b64)
+                                for _, b64 in detail_images
+                            ],
+                        ],
+                    )
+                )
             yield event.chain_result([Nodes(nodes)])
         else:
-            yield event.plain_result(details_text)
+            msg_chain: list[BaseMessageComponent] = [Comp.Plain(details_text)]
+            msg_chain.extend(Comp.Image.fromBase64(b64) for _, b64 in detail_images)
+            yield event.chain_result(msg_chain)
 
     @filter.command("lmd")
     async def save_id_image_command(self, event: AstrMessageEvent, image_id: str = ""):
@@ -2578,7 +2621,11 @@ class BigBanana(Star):
             if not trigger_word:
                 yield event.plain_result(f"❌ 用法：{cmd} <触发词>")
             else:
-                yield event.plain_result(self._format_prompt_details(trigger_word))
+                details_text = self._format_prompt_details(trigger_word)
+                detail_images = await self._load_prompt_detail_images(trigger_word)
+                msg_chain: list[BaseMessageComponent] = [Comp.Plain(details_text)]
+                msg_chain.extend(Comp.Image.fromBase64(b64) for _, b64 in detail_images)
+                yield event.chain_result(msg_chain)
             event.stop_event()
             return
         if cmd == "lmd":
