@@ -2244,6 +2244,7 @@ class BigBanana(Star):
         self._save_prompt_config_and_backup()
         self.init_prompts()
         yield event.plain_result(f"✅ 已成功{action}提示词：「{trigger_word}」")
+        event.stop_event()
 
     @filter.command("lm列表", alias={"lml", "lmpl"})
     async def list_prompts_command(self, event: AstrMessageEvent):
@@ -2437,6 +2438,11 @@ class BigBanana(Star):
             return
 
         cmd = message_str.split(" ", 1)[0]
+        if cmd == "lmp":
+            async for result in self.add_prompt_quick_command(event):
+                yield result
+            event.stop_event()
+            return
         if cmd in {"lm列表", "lml", "lmpl"}:
             yield event.plain_result(self._format_prompt_list())
             event.stop_event()
