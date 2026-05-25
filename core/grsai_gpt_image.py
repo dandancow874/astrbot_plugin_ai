@@ -450,37 +450,12 @@ class GrsaiGPTImageVIPProvider(GrsaiGPTImageProvider):
         return root.rstrip("/") + "/v1/api/generate"
 
     @staticmethod
-    def _round8(value: float) -> int:
-        return max(64, int(round(value / 8) * 8))
-
-    @classmethod
     def _resolve_vip_aspect_ratio(
-        cls,
         aspect_ratio: object,
-        image_size: object,
         image_b64_list: list[tuple[str, str]],
     ) -> str:
-        size_text = str(image_size or "").strip().upper()
-        long_edge = 1024
-        if size_text == "2K":
-            long_edge = 2048
-        elif size_text == "4K":
-            long_edge = 4096
-
-        ratio_text = cls._resolve_payload_size(aspect_ratio, image_b64_list)
-        try:
-            left, right = ratio_text.split(":", 1)
-            ratio = float(left) / float(right)
-        except Exception:
-            ratio = 1.0
-
-        if ratio >= 1:
-            width = long_edge
-            height = cls._round8(long_edge / ratio)
-        else:
-            width = cls._round8(long_edge * ratio)
-            height = long_edge
-        return f"{width}x{height}"
+        # VIP 模型自带固定分辨率，aspectRatio 只传比例，不换算为 2304x4096 这类尺寸。
+        return GrsaiGPTImageProvider._resolve_payload_size(aspect_ratio, image_b64_list)
 
     async def _call_api(
         self,
@@ -503,7 +478,7 @@ class GrsaiGPTImageVIPProvider(GrsaiGPTImageProvider):
         images = image_data_urls or urls
 
         aspect_ratio = self._resolve_vip_aspect_ratio(
-            params.get("aspect_ratio"), params.get("image_size"), image_b64_list
+            params.get("aspect_ratio"), image_b64_list
         )
         payload: dict = {
             "model": model,
