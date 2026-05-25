@@ -449,13 +449,100 @@ class GrsaiGPTImageVIPProvider(GrsaiGPTImageProvider):
             root = raw[: -len("/v1")]
         return root.rstrip("/") + "/v1/api/generate"
 
+    VIP_RATIO_SIZE_MAP: dict[str, dict[str, str]] = {
+        "1:1": {"1K": "1024x1024", "2K": "2048x2048", "4K": "2880x2880"},
+        "16:9": {"1K": "1280x720", "2K": "2048x1152", "4K": "3840x2160"},
+        "9:16": {"1K": "720x1280", "2K": "1152x2048", "4K": "2160x3840"},
+        "4:3": {"1K": "1152x864", "2K": "2304x1728", "4K": "3264x2448"},
+        "3:4": {"1K": "864x1152", "2K": "1728x2304", "4K": "2448x3264"},
+        "3:2": {"1K": "1536x1024", "2K": "2048x1360", "4K": "3504x2336"},
+        "2:3": {"1K": "1024x1536", "2K": "1360x2048", "4K": "2336x3504"},
+        "5:4": {"1K": "1120x896", "2K": "2240x1792", "4K": "3200x2560"},
+        "4:5": {"1K": "896x1120", "2K": "1792x2240", "4K": "2560x3200"},
+        "21:9": {"1K": "1456x624", "2K": "2912x1248", "4K": "3840x1648"},
+        "9:21": {"1K": "624x1456", "2K": "1248x2912", "4K": "1648x3840"},
+        "1:3": {"2K": "688x2048", "4K": "1280x3840"},
+        "3:1": {"2K": "2048x688", "4K": "3840x1280"},
+        "2:1": {"1K": "1536x768", "2K": "3072x1536", "4K": "3840x1920"},
+        "1:2": {"1K": "768x1536", "2K": "1536x3072", "4K": "1920x3840"},
+    }
+
     @staticmethod
+    def _parse_ratio_value(ratio_text: str) -> float | None:
+        try:
+            left, right = ratio_text.split(":", 1)
+            w = float(left)
+            h = float(right)
+        except Exception:
+            return None
+        if w <= 0 or h <= 0:
+            return None
+        return w / h
+
+    @staticmethod
+    def _round_to_16(value: float) -> int:
+        return max(16, int(round(value / 16) * 16))
+
+    @classmethod
+    def _fit_vip_constraints(cls, ratio: float, target_area: int) -> str:
+        ratio = max(1 / 3, min(3, ratio))
+        max_area = 8_294_400
+        min_area = 655_360
+        area = min(max(target_area, min_area), max_area)
+        width = math.sqrt(area * ratio)
+        height = math.sqrt(area / ratio)
+
+        if width > 3840:
+            width = 3840
+            height = width / ratio
+        if height > 3840:
+            height = 3840
+            width = height * ratio
+
+        w = cls._round_to_16(width)
+        h = cls._round_to_16(height)
+        w = min(3840, max(16, w - (w % 16)))
+        h = min(3840, max(16, h - (h % 16)))
+
+        while w * h > max_area and w > 16 and h > 16:
+            if w >= h:
+                w -= 16
+                h = cls._round_to_16(w / ratio)
+            else:
+                h -= 16
+                w = cls._round_to_16(h * ratio)
+            w = min(3840, max(16, w - (w % 16)))
+            h = min(3840, max(16, h - (h % 16)))
+
+        return f"{w}x{h}"
+
+    @classmethod
     def _resolve_vip_aspect_ratio(
+        cls,
         aspect_ratio: object,
+        image_size: object,
         image_b64_list: list[tuple[str, str]],
     ) -> str:
-        # VIP 模型自带固定分辨率，aspectRatio 只传比例，不换算为 2304x4096 这类尺寸。
-        return GrsaiGPTImageProvider._resolve_payload_size(aspect_ratio, image_b64_list)
+        ratio_text = GrsaiGPTImageProvider._resolve_payload_size(
+            aspect_ratio, image_b64_list
+        )
+        size_text = str(image_size or "1K").strip().upper()
+        if size_text not in {"1K", "2K", "4K"}:
+            size_text = "1K"
+
+        fixed = cls.VIP_RATIO_SIZE_MAP.get(ratio_text, {}).get(size_text)
+        if fixed:
+            return fixed
+
+        ratio = cls._parse_ratio_value(ratio_text)
+        if ratio is None:
+            return cls.VIP_RATIO_SIZE_MAP["1:1"][size_text]
+        target_area = {
+            "1K": 1_048_576,
+            "2K": 4_194_304,
+            "4K": 8_294_400,
+        }[size_text]
+        return cls._fit_vip_constraints(ratio, target_area)
 
     async def _call_api(
         self,
@@ -478,7 +565,7 @@ class GrsaiGPTImageVIPProvider(GrsaiGPTImageProvider):
         images = image_data_urls or urls
 
         aspect_ratio = self._resolve_vip_aspect_ratio(
-            params.get("aspect_ratio"), image_b64_list
+            params.get("aspect_ratio"), params.get("image_size"), image_b64_list
         )
         payload: dict = {
             "model": model,
