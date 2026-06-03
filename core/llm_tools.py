@@ -1,12 +1,14 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
+import re
 from typing import TYPE_CHECKING, Any
 
 # from mcp.types import CallToolResult, ContentBlock, ImageContent
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 
+import astrbot.api.message_components as Comp
 from astrbot.api import logger
 from astrbot.api.star import Context, StarTools
 from astrbot.core.agent.run_context import ContextWrapper
@@ -196,6 +198,84 @@ class LegacyBananaImageGenerationTool(FunctionTool[AstrAgentContext]):
         }
     )
     # fmt: on
+
+    @staticmethod
+    def _latest_plain_text(event: AstrMessageEvent) -> str:
+        parts: list[str] = []
+        for comp in event.get_messages():
+            if isinstance(comp, Comp.Plain):
+                parts.append(str(comp.text or ""))
+        text = " ".join(parts).strip()
+        if not text:
+            text = str(getattr(event, "message_str", "") or "").strip()
+        text = re.sub(r"\[MSG_ID:[^\]]+\]", "", text, flags=re.I).strip()
+        return text
+
+    @staticmethod
+    def _message_has_image(event: AstrMessageEvent) -> bool:
+        for comp in event.get_messages():
+            if isinstance(comp, Comp.Image):
+                return True
+            if isinstance(comp, Comp.File) and str(getattr(comp, "url", "") or ""):
+                url = str(comp.url)
+                if url.startswith("http") and re.search(
+                    r"\.(png|jpe?g|webp|bmp|gif|heic|heif)(?:$|[?#])",
+                    url,
+                    flags=re.I,
+                ):
+                    return True
+            if isinstance(comp, Comp.Reply) and getattr(comp, "chain", None):
+                quote_chain = comp.chain
+                if not isinstance(quote_chain, list) and hasattr(quote_chain, "chain"):
+                    quote_chain = getattr(quote_chain, "chain", None)
+                for quote in quote_chain or []:
+                    if isinstance(quote, Comp.Image):
+                        return True
+                    if isinstance(quote, Comp.File) and str(
+                        getattr(quote, "url", "") or ""
+                    ):
+                        url = str(quote.url)
+                        if url.startswith("http") and re.search(
+                            r"\.(png|jpe?g|webp|bmp|gif|heic|heif)(?:$|[?#])",
+                            url,
+                            flags=re.I,
+                        ):
+                            return True
+        return False
+
+    @staticmethod
+    def _looks_like_current_image_request(text: str) -> bool:
+        text = str(text or "").strip()
+        if not text:
+            return False
+        return bool(
+            re.search(
+                r"(参考|用|按|照着|基于).{0,8}(这张|这图|图片|图)|图生图|改图|换成|不同的照片|不要分割|不分割",
+                text,
+            )
+        )
+
+    @classmethod
+    def _current_image_prompt_override(
+        cls, event: AstrMessageEvent, prompt: object
+    ) -> str | None:
+        latest_text = cls._latest_plain_text(event)
+        if not cls._message_has_image(event):
+            return None
+        if not cls._looks_like_current_image_request(latest_text):
+            return None
+
+        user_request = latest_text or "参考当前消息中的图片生成一张不同的照片"
+        return (
+            "Strictly use the image attached in the latest/current user message as "
+            "the only visual reference. Ignore all previous conversation images, "
+            "previous prompts, previous product subjects, and previous tool arguments. "
+            "Preserve the main subject identity and key visual characteristics from "
+            "the current image, then follow this latest user request: "
+            f"{user_request}. Generate one single unified image, not a split image, "
+            "not a comparison layout, no before/after panels."
+        )
+
     async def call(
         self,
         context: ContextWrapper[AstrAgentContext],  # type: ignore
@@ -213,6 +293,13 @@ class LegacyBananaImageGenerationTool(FunctionTool[AstrAgentContext]):
         referer_id = kwargs.get("referer_id", [])
         aspect_ratio = kwargs.get("aspect_ratio", None)
         image_id = kwargs.get("image_id", None)
+
+        prompt_override = self._current_image_prompt_override(event, prompt)
+        if prompt_override:
+            logger.warning(
+                "[AI IMAGE] LLM 工具检测到当前消息图片请求，已覆盖可能来自历史上下文的 prompt"
+            )
+            prompt = prompt_override
 
         # 群白名单判断
         if (
