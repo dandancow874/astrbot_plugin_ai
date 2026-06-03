@@ -163,7 +163,11 @@ class LegacyBananaImageGenerationTool(FunctionTool[AstrAgentContext]):
 "in a logical sequence that explicitly describes specific physical actions, nuanced facial"
 "expressions, and the overall color scheme with lighting atmosphere. This parameter must be"
 "populated with the full, descriptive prompt content rather than just a preset name,"
-"even if derived from one, to guarantee the generation of a vivid and strictly defined image."),
+"even if derived from one, to guarantee the generation of a vivid and strictly defined image. "
+"Use only the user's latest/current message as the source of intent. Do not copy, reuse, "
+"continue, or lightly modify prompts or visual details from earlier turns unless the latest "
+"message explicitly asks to continue or modify a previous image. When the latest message "
+"contains a new image, describe and transform that new image only."),
                 },
                 "preset_name": {
                     "type": "string",
@@ -325,7 +329,11 @@ class AIImageGenerationTool(LegacyBananaImageGenerationTool):
     name: str = "ai_image_generation"
     description: str = (
         "Use this tool whenever the user asks ai生图 / astrbot_plugin_ai to generate, create, draw, make, edit, or transform an image. "
-        "It supports text-to-image and reference-image editing. Use saved image ids from lmd via the image_id parameter."
+        "It supports text-to-image and reference-image editing. Use saved image ids from lmd via the image_id parameter. "
+        "Critical: build the prompt from the user's latest/current message only. Do not reuse or continue any image subject, "
+        "tool arguments, prompt, reference-image intent, or visual details from earlier conversation turns unless the latest "
+        "message explicitly asks to continue, modify, or reference a previous image. If the latest message contains a new image, "
+        "that image and the latest text fully override previous visual context."
     )
 
 
