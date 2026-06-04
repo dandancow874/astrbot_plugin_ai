@@ -155,6 +155,47 @@ class AIImage(Star):
             tokens.extend(part.split(","))
         return [t.strip() for t in tokens if t.strip()]
 
+    @staticmethod
+    def _parse_concurrency_limit(raw: object, default: int = 4) -> int:
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            value = default
+        return max(1, min(value, 100))
+
+    @staticmethod
+    def _provider_runtime_key(provider: ProviderConfig) -> str:
+        return "|".join(
+            [
+                str(provider.name or ""),
+                str(provider.api_type or ""),
+                str(provider.api_url or ""),
+                str(provider.model or ""),
+            ]
+        )
+
+    def _try_acquire_provider_slot(
+        self, provider: ProviderConfig
+    ) -> asyncio.Semaphore | None:
+        limit = self._parse_concurrency_limit(
+            getattr(provider, "concurrency_limit", 4), 4
+        )
+        key = self._provider_runtime_key(provider)
+        cached = self.provider_semaphores.get(key)
+        if cached is None or cached[0] != limit:
+            cached = (limit, asyncio.Semaphore(limit))
+            self.provider_semaphores[key] = cached
+        semaphore = cached[1]
+        if getattr(semaphore, "_value", 0) <= 0:
+            return None
+        semaphore._value -= 1
+        return semaphore
+
+    @staticmethod
+    def _release_provider_slot(semaphore: asyncio.Semaphore | None) -> None:
+        if semaphore is not None:
+            semaphore.release()
+
     def _collect_image_urls(self, event: AstrMessageEvent) -> list[str]:
         image_urls: list[str] = []
         for comp in event.get_messages():
@@ -494,6 +535,7 @@ class AIImage(Star):
         # 正在运行的任务映射
         self.running_tasks: dict[str, asyncio.Task] = {}
         self.job_semaphore: asyncio.Semaphore | None = None
+        self.provider_semaphores: dict[str, tuple[int, asyncio.Semaphore]] = {}
         self.comfyui_lock: asyncio.Lock | None = None
 
     async def initialize(self):
@@ -960,6 +1002,8 @@ class AIImage(Star):
         self.models: list[ModelConfig] = []
         # 提供商实例映射
         self.provider_map: dict[str, BaseProvider] = {}
+        # 提供商并发槽位按当前配置懒加载；配置刷新时清空旧限制。
+        self.provider_semaphores = {}
 
         # 1. 获取模型配置列表
         models_data = self.conf.get("models", [])
@@ -1135,6 +1179,14 @@ class AIImage(Star):
                 ):
                     item["api_type"] = "ZImage_Provider"
 
+                item["concurrency_limit"] = self._parse_concurrency_limit(
+                    conf.get(
+                        "concurrency_limit",
+                        model_conf.get("concurrency_limit", 4),
+                    ),
+                    4,
+                )
+
                 if api_type == "Vertex_AI_Anonymous":
                     item["keys"] = []
                     base_name = "Vertex匿名"
@@ -1187,6 +1239,45 @@ class AIImage(Star):
                     provider_list.append(secondary_data)
 
                 providers = provider_list
+
+            if conf_key == "gpt_image_config" and isinstance(providers, list):
+                providers = [
+                    item
+                    for item in providers
+                    if not (
+                        isinstance(item, dict)
+                        and (
+                            item.get("model") == "yunwu-gpt-image-2"
+                            or item.get("name") == "GPT Image Yunwu账号"
+                        )
+                    )
+                ]
+                yunwu_conf = model_conf.get("yunwu", {})
+                if not isinstance(yunwu_conf, dict):
+                    yunwu_conf = {}
+                if bool(yunwu_conf.get("enabled", False)):
+                    yunwu_url = str(
+                        yunwu_conf.get("api_url", "https://api3.wlai.vip") or ""
+                    ).strip()
+                    if not yunwu_url:
+                        yunwu_url = "https://api3.wlai.vip"
+                    yunwu_item = build_provider_item(
+                        {
+                            "api_type": "OpenAI_Images",
+                            "api_url": yunwu_url,
+                            "api_key": yunwu_conf.get("api_key", ""),
+                            "model": "yunwu-gpt-image-2",
+                            "tls_verify": yunwu_conf.get("tls_verify", True),
+                            "impersonate": yunwu_conf.get("impersonate", "chrome131"),
+                            "concurrency_limit": yunwu_conf.get("concurrency_limit", 4),
+                        },
+                        "Yunwu",
+                    )
+                    yunwu_item["name"] = "GPT Image Yunwu账号"
+                    yunwu_item["api_type"] = "OpenAI_Images"
+                    yunwu_item["api_url"] = yunwu_url
+                    yunwu_item["model"] = "yunwu-gpt-image-2"
+                    providers.append(yunwu_item)
 
             if (
                 conf_key == "nanobanana_config"
@@ -2927,9 +3018,21 @@ class AIImage(Star):
             ):
                 params.setdefault("model", selected_model)
 
+        common_conf = self.conf.get("common_config", {})
+        if not isinstance(common_conf, dict):
+            common_conf = {}
+        preferred_provider_model = str(
+            common_conf.get("default_provider_model", "") or ""
+        ).strip()
+        selected_provider_model = str(params.get("model", "") or "").strip()
+        should_keep_yunwu_gpt_image = "yunwu-gpt-image-2" in {
+            selected_provider_model,
+            preferred_provider_model,
+        }
         if (
             cmd == "gpt"
             and str(params.get("image_size", "") or "").strip().upper() in {"2K", "4K"}
+            and not should_keep_yunwu_gpt_image
         ):
             params["__model_name__"] = "GPT-Image-2-VIP"
             params["model"] = "gpt-image-2-vip"
@@ -3788,6 +3891,16 @@ class AIImage(Star):
 
         # 调度提供商
         for i, provider in enumerate(candidate_providers):
+            provider_slot = self._try_acquire_provider_slot(provider)
+            if provider_slot is None:
+                err = (
+                    f"提供商 {provider.name} 当前并发已满"
+                    f"（上限 {self._parse_concurrency_limit(getattr(provider, 'concurrency_limit', 4), 4)}）"
+                )
+                params["__best_err__"] = err
+                logger.warning(f"{err}，尝试使用下一个提供商...")
+                continue
+
             if provider.api_type not in self.provider_map:
                 provider_cls = BaseProvider.get_provider_class(provider.api_type)
                 if provider_cls is None:
@@ -3795,6 +3908,7 @@ class AIImage(Star):
                     provider_cls = BaseProvider.get_provider_class(provider.api_type)
                 if provider_cls is None:
                     logger.warning(f"提供商类型 {provider.api_type} 未初始化，跳过")
+                    self._release_provider_slot(provider_slot)
                     continue
                 self.provider_map[provider.api_type] = provider_cls(
                     config=self.conf,
@@ -3813,29 +3927,32 @@ class AIImage(Star):
                 f"[AI IMAGE] Dispatch check: type={provider.api_type}, url={provider.api_url}, params_model={params_model}, provider_model={provider_model}"
             )
 
-            if provider.api_type == "OpenAI_Chat" and (
-                "grsai" in (provider.api_url or "").lower()
-                or "dakka.com.cn" in (provider.api_url or "").lower()
-            ):
-                # 检查是否为 nano-banana-pro 模型，如果是且未指定 image_size，则强制设置为 2K
-                # 这里的逻辑涵盖了 bp2 命令之外的调用（如预设提示词）
-                current_model = (params_model or provider_model).strip()
-                if current_model == "nano-banana-pro":
-                    if "image_size" not in call_params or not call_params["image_size"]:
-                        # 确保不影响原 params 对象，虽然 call_params 此时是指向 params 的引用
-                        # 如果需要隔离，应该 copy。但这里我们希望这个默认值生效。
-                        call_params["image_size"] = "2K"
-                        logger.info(
-                            f"[AI IMAGE] 为 nano-banana-pro 强制设置默认分辨率: 2K"
-                        )
+            try:
+                if provider.api_type == "OpenAI_Chat" and (
+                    "grsai" in (provider.api_url or "").lower()
+                    or "dakka.com.cn" in (provider.api_url or "").lower()
+                ):
+                    # 检查是否为 nano-banana-pro 模型，如果是且未指定 image_size，则强制设置为 2K
+                    # 这里的逻辑涵盖了 bp2 命令之外的调用（如预设提示词）
+                    current_model = (params_model or provider_model).strip()
+                    if current_model == "nano-banana-pro":
+                        if "image_size" not in call_params or not call_params["image_size"]:
+                            # 确保不影响原 params 对象，虽然 call_params 此时是指向 params 的引用
+                            # 如果需要隔离，应该 copy。但这里我们希望这个默认值生效。
+                            call_params["image_size"] = "2K"
+                            logger.info(
+                                f"[AI IMAGE] 为 nano-banana-pro 强制设置默认分辨率: 2K"
+                            )
 
-            images_result, err = await self.provider_map[
-                provider.api_type
-            ].generate_images(
-                provider_config=provider,
-                params=call_params,
-                image_b64_list=image_b64_list,
-            )
+                images_result, err = await self.provider_map[
+                    provider.api_type
+                ].generate_images(
+                    provider_config=provider,
+                    params=call_params,
+                    image_b64_list=image_b64_list,
+                )
+            finally:
+                self._release_provider_slot(provider_slot)
             if (
                 not images_result
                 and isinstance(err, str)
@@ -3894,15 +4011,25 @@ class AIImage(Star):
                 fallback_params.pop("model", None)
                 fallback_params.pop("__user_overrode_model__", None)
                 for i, provider in enumerate(remaining):
-                    if provider.api_type not in self.provider_map:
+                    provider_slot = self._try_acquire_provider_slot(provider)
+                    if provider_slot is None:
+                        logger.warning(
+                            f"备用提供商 {provider.name} 当前并发已满，跳过"
+                        )
                         continue
-                    images_result, err = await self.provider_map[
-                        provider.api_type
-                    ].generate_images(
-                        provider_config=provider,
-                        params=fallback_params,
-                        image_b64_list=image_b64_list,
-                    )
+                    if provider.api_type not in self.provider_map:
+                        self._release_provider_slot(provider_slot)
+                        continue
+                    try:
+                        images_result, err = await self.provider_map[
+                            provider.api_type
+                        ].generate_images(
+                            provider_config=provider,
+                            params=fallback_params,
+                            image_b64_list=image_b64_list,
+                        )
+                    finally:
+                        self._release_provider_slot(provider_slot)
                     if images_result:
                         logger.info(
                             f"模型 {target_model.name} - {provider.name} 图片生成成功"

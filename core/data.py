@@ -36,6 +36,8 @@ class ProviderConfig:
     """是否验证 TLS 证书（None 表示使用默认行为）"""
     impersonate: str | None = None
     """curl_cffi 指纹伪装标识（None 表示不启用）"""
+    concurrency_limit: int = 4
+    """该提供商允许同时运行的生图任务数"""
 
 
 @dataclass(repr=False, slots=True)

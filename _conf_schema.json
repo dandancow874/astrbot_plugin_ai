@@ -365,6 +365,52 @@
                         "default": "",
                         "hint": "直接粘贴 grsai API Key。多个 Key 可用英文逗号或换行分隔。"
                     },
+                    "concurrency_limit": {
+                        "description": "并发数",
+                        "type": "int",
+                        "default": 4,
+                        "hint": "该供应商最多同时运行的生图任务数。超过后会自动尝试下一个供应商。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
+                    }
+                }
+            },
+            "yunwu": {
+                "description": "备用提供商 (Yunwu)",
+                "type": "object",
+                "hint": "Yunwu 使用 OpenAI 图片接口。国内: https://api3.wlai.vip，国外: https://api.apiplus.org。启用后可用「模型切换 yunwu-gpt-image-2」切换；1K/2K/4K 都会请求 gpt-image-2。",
+                "items": {
+                    "enabled": {
+                        "description": "启用 Yunwu",
+                        "type": "bool",
+                        "default": false
+                    },
+                    "api_url": {
+                        "description": "Yunwu API 地址",
+                        "type": "string",
+                        "default": "https://api3.wlai.vip",
+                        "hint": "国内: https://api3.wlai.vip；国外: https://api.apiplus.org。填 Host 或 /v1 地址都可以。"
+                    },
+                    "api_key": {
+                        "description": "Yunwu API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "直接粘贴 Yunwu API Key。多个 Key 可用英文逗号或换行分隔。"
+                    },
+                    "concurrency_limit": {
+                        "description": "并发数",
+                        "type": "int",
+                        "default": 4,
+                        "hint": "该供应商最多同时运行的生图任务数。超过后会自动尝试下一个供应商。"
+                    },
                     "tls_verify": {
                         "description": "TLS证书验证",
                         "type": "bool",

@@ -3,6 +3,8 @@ import re
 import base64
 import asyncio
 import time
+import math
+from io import BytesIO
 from urllib.parse import urlparse
 
 from aiohttp import ClientTimeout
@@ -823,12 +825,221 @@ class OpenAIChatProvider(BaseProvider):
 class OpenAIImagesProvider(BaseProvider):
     api_type: str = "OpenAI_Images"
 
+    YUNWU_PROVIDER_MODEL = "yunwu-gpt-image-2"
+    YUNWU_API_HOSTS = ("api.apiplus.org", "api3.wlai.vip")
+    SUPPORTED_RATIOS: tuple[tuple[str, float], ...] = (
+        ("1:1", 1.0),
+        ("16:9", 16 / 9),
+        ("9:16", 9 / 16),
+        ("4:3", 4 / 3),
+        ("3:4", 3 / 4),
+        ("3:2", 3 / 2),
+        ("2:3", 2 / 3),
+        ("5:4", 5 / 4),
+        ("4:5", 4 / 5),
+        ("21:9", 21 / 9),
+        ("9:21", 9 / 21),
+        ("1:3", 1 / 3),
+        ("3:1", 3.0),
+        ("2:1", 2.0),
+        ("1:2", 0.5),
+    )
+    YUNWU_RATIO_SIZE_MAP: dict[str, dict[str, str]] = {
+        "1:1": {"1K": "1024x1024", "2K": "2048x2048", "4K": "2880x2880"},
+        "16:9": {"1K": "1280x720", "2K": "2048x1152", "4K": "3840x2160"},
+        "9:16": {"1K": "720x1280", "2K": "1152x2048", "4K": "2160x3840"},
+        "4:3": {"1K": "1152x864", "2K": "2304x1728", "4K": "3264x2448"},
+        "3:4": {"1K": "864x1152", "2K": "1728x2304", "4K": "2448x3264"},
+        "3:2": {"1K": "1536x1024", "2K": "2048x1360", "4K": "3504x2336"},
+        "2:3": {"1K": "1024x1536", "2K": "1360x2048", "4K": "2336x3504"},
+        "5:4": {"1K": "1120x896", "2K": "2240x1792", "4K": "3200x2560"},
+        "4:5": {"1K": "896x1120", "2K": "1792x2240", "4K": "2560x3200"},
+        "21:9": {"1K": "1456x624", "2K": "2912x1248", "4K": "3840x1648"},
+        "9:21": {"1K": "624x1456", "2K": "1248x2912", "4K": "1648x3840"},
+        "1:3": {"2K": "688x2048", "4K": "1280x3840"},
+        "3:1": {"2K": "2048x688", "4K": "3840x1280"},
+        "2:1": {"1K": "1536x768", "2K": "3072x1536", "4K": "3840x1920"},
+        "1:2": {"1K": "768x1536", "2K": "1536x3072", "4K": "1920x3840"},
+    }
+
     @staticmethod
     def _is_edits_url(url: object) -> bool:
         if not isinstance(url, str):
             return False
         u = url.lower()
         return "/images/edits" in u or u.endswith("/edits")
+
+    @classmethod
+    def _is_yunwu(cls, api_url: object, model: object = "") -> bool:
+        url = api_url.lower() if isinstance(api_url, str) else ""
+        model_text = str(model or "").strip()
+        return model_text == cls.YUNWU_PROVIDER_MODEL or any(
+            host in url for host in cls.YUNWU_API_HOSTS
+        )
+
+    @classmethod
+    def _resolve_request_model(cls, provider_config: ProviderConfig, params: dict) -> str:
+        model = str(params.get("model") or provider_config.model or "").strip()
+        if cls._is_yunwu(provider_config.api_url, provider_config.model) or model == cls.YUNWU_PROVIDER_MODEL:
+            return "gpt-image-2"
+        return model or provider_config.model
+
+    @staticmethod
+    def _normalize_ratio(ratio: object) -> str:
+        text = str(ratio or "").strip().lower()
+        if not text:
+            return "default"
+        aliases = {
+            "default": "default",
+            "auto": "auto",
+            "square": "1:1",
+            "portrait": "9:16",
+            "landscape": "16:9",
+        }
+        if text in aliases:
+            return aliases[text]
+        text = text.replace("：", ":").replace("*", "x").replace("×", "x")
+        if "x" in text and ":" not in text:
+            left, right = text.split("x", 1)
+        elif ":" in text:
+            left, right = text.split(":", 1)
+        else:
+            return text
+        try:
+            w = float(left.strip())
+            h = float(right.strip())
+        except Exception:
+            return text
+        if w <= 0 or h <= 0:
+            return text
+        return f"{int(w) if w.is_integer() else w:g}:{int(h) if h.is_integer() else h:g}"
+
+    @classmethod
+    def _nearest_supported_ratio(cls, width: int, height: int) -> str:
+        if width <= 0 or height <= 0:
+            return "1:1"
+        actual = width / height
+        return min(
+            cls.SUPPORTED_RATIOS,
+            key=lambda item: abs(math.log(actual / item[1])),
+        )[0]
+
+    @staticmethod
+    def _infer_b64_dimensions(b64: str) -> tuple[int, int] | None:
+        if not isinstance(b64, str) or not b64.strip():
+            return None
+        try:
+            raw = base64.b64decode(b64, validate=False)
+        except Exception:
+            return None
+        try:
+            from PIL import Image
+
+            with Image.open(BytesIO(raw)) as img:
+                width, height = img.size
+        except Exception:
+            return None
+        if width > 0 and height > 0:
+            return width, height
+        return None
+
+    @staticmethod
+    def _parse_ratio_value(ratio_text: str) -> float | None:
+        try:
+            left, right = ratio_text.split(":", 1)
+            w = float(left)
+            h = float(right)
+        except Exception:
+            return None
+        if w <= 0 or h <= 0:
+            return None
+        return w / h
+
+    @staticmethod
+    def _round_to_16(value: float) -> int:
+        return max(16, int(round(value / 16) * 16))
+
+    @classmethod
+    def _fit_yunwu_constraints(cls, ratio: float, target_area: int) -> str:
+        ratio = max(1 / 3, min(3, ratio))
+        max_area = 8_294_400
+        min_area = 655_360
+        area = min(max(target_area, min_area), max_area)
+        width = math.sqrt(area * ratio)
+        height = math.sqrt(area / ratio)
+
+        if width > 3840:
+            width = 3840
+            height = width / ratio
+        if height > 3840:
+            height = 3840
+            width = height * ratio
+
+        w = cls._round_to_16(width)
+        h = cls._round_to_16(height)
+        w = min(3840, max(16, w - (w % 16)))
+        h = min(3840, max(16, h - (h % 16)))
+
+        while w * h > max_area and w > 16 and h > 16:
+            if w >= h:
+                w -= 16
+                h = cls._round_to_16(w / ratio)
+            else:
+                h -= 16
+                w = cls._round_to_16(h * ratio)
+            w = min(3840, max(16, w - (w % 16)))
+            h = min(3840, max(16, h - (h % 16)))
+
+        return f"{w}x{h}"
+
+    @classmethod
+    def _resolve_yunwu_ratio(
+        cls,
+        aspect_ratio: object,
+        image_b64_list: list[tuple[str, str]],
+    ) -> str:
+        ar = cls._normalize_ratio(aspect_ratio)
+        if ar == "default":
+            return "1:1" if image_b64_list else "9:16"
+        if ar == "auto":
+            for _, b64 in image_b64_list:
+                dim = cls._infer_b64_dimensions(b64)
+                if dim:
+                    resolved = cls._nearest_supported_ratio(dim[0], dim[1])
+                    logger.info(
+                        f"[Yunwu GPT Image] auto size: source={dim[0]}x{dim[1]} -> {resolved}"
+                    )
+                    return resolved
+            return "1:1" if image_b64_list else "9:16"
+        return ar
+
+    @classmethod
+    def _map_yunwu_size(
+        cls,
+        image_size: object,
+        aspect_ratio: object,
+        image_b64_list: list[tuple[str, str]],
+    ) -> str:
+        size_text = str(image_size or "1K").strip().upper()
+        if "X" in size_text and all(p.isdigit() for p in size_text.split("X", 1)):
+            return size_text.lower()
+        if size_text not in {"1K", "2K", "4K"}:
+            size_text = "1K"
+
+        ratio_text = cls._resolve_yunwu_ratio(aspect_ratio, image_b64_list)
+        fixed = cls.YUNWU_RATIO_SIZE_MAP.get(ratio_text, {}).get(size_text)
+        if fixed:
+            return fixed
+
+        ratio = cls._parse_ratio_value(ratio_text)
+        if ratio is None:
+            return cls.YUNWU_RATIO_SIZE_MAP["1:1"][size_text]
+        target_area = {
+            "1K": 1_048_576,
+            "2K": 4_194_304,
+            "4K": 8_294_400,
+        }[size_text]
+        return cls._fit_yunwu_constraints(ratio, target_area)
 
     @staticmethod
     def _resolve_images_url(api_url: str, prefer_edits: bool) -> str:
@@ -1004,11 +1215,15 @@ class OpenAIImagesProvider(BaseProvider):
             "Authorization": f"Bearer {api_key}",
         }
 
+        is_yunwu = self._is_yunwu(provider_config.api_url, provider_config.model)
         body: dict = {
             "prompt": params.get("prompt", "anything"),
-            "model": params.get("model", provider_config.model),
+            "model": self._resolve_request_model(provider_config, params),
             "response_format": "b64_json",
         }
+        if is_yunwu:
+            body["moderation"] = "low"
+            body["background"] = "auto"
 
         # 处理生成数量参数 n
         n_param = params.get("n")
@@ -1023,27 +1238,32 @@ class OpenAIImagesProvider(BaseProvider):
             if 1 <= n_param <= 10:
                 body["n"] = n_param
 
-        # 处理宽高比参数，映射到具体尺寸
-        aspect_ratio = params.get("aspect_ratio")
-        if isinstance(aspect_ratio, str) and aspect_ratio.strip():
-            # Grok API 只支持具体尺寸，需要将宽高比映射到具体尺寸
-            # 允许的尺寸: 1024x1024, 1024x1792, 1280x720, 1792x1024, 720x1280
-            grok_ar_map = {
-                "16:9": "1280x720",
-                "9:16": "720x1280",
-                "1:1": "1024x1024",
-                "2:3": "1024x1792",  # 使用 9:16 尺寸作为替代
-                "3:2": "1792x1024",  # 使用 16:10 尺寸作为替代
-            }
-            ar_key = aspect_ratio.strip()
-            if ar_key in grok_ar_map:
-                body["size"] = grok_ar_map[ar_key]
-            else:
-                # 默认使用 1:1
-                body["size"] = "1024x1024"
+        if is_yunwu:
+            body["size"] = self._map_yunwu_size(
+                params.get("image_size"), params.get("aspect_ratio"), image_b64_list
+            )
         else:
-            # 没有宽高比时，使用默认尺寸
-            body["size"] = "1024x1024"
+            # 处理宽高比参数，映射到具体尺寸
+            aspect_ratio = params.get("aspect_ratio")
+            if isinstance(aspect_ratio, str) and aspect_ratio.strip():
+                # Grok API 只支持具体尺寸，需要将宽高比映射到具体尺寸
+                # 允许的尺寸: 1024x1024, 1024x1792, 1280x720, 1792x1024, 720x1280
+                grok_ar_map = {
+                    "16:9": "1280x720",
+                    "9:16": "720x1280",
+                    "1:1": "1024x1024",
+                    "2:3": "1024x1792",  # 使用 9:16 尺寸作为替代
+                    "3:2": "1792x1024",  # 使用 16:10 尺寸作为替代
+                }
+                ar_key = aspect_ratio.strip()
+                if ar_key in grok_ar_map:
+                    body["size"] = grok_ar_map[ar_key]
+                else:
+                    # 默认使用 1:1
+                    body["size"] = "1024x1024"
+            else:
+                # 没有宽高比时，使用默认尺寸
+                body["size"] = "1024x1024"
 
         try:
             impersonate = (
@@ -1175,14 +1395,22 @@ class OpenAIImagesProvider(BaseProvider):
             "Authorization": f"Bearer {api_key}",
         }
 
+        is_yunwu = self._is_yunwu(provider_config.api_url, provider_config.model)
         form: dict = {
             "prompt": params.get("prompt", "anything"),
-            "model": params.get("model", provider_config.model),
+            "model": self._resolve_request_model(provider_config, params),
             "response_format": "b64_json",
         }
-        mapped_size = self._map_image_size(
-            params.get("image_size"), params.get("aspect_ratio")
-        )
+        if is_yunwu:
+            form["moderation"] = "low"
+            form["background"] = "auto"
+            mapped_size = self._map_yunwu_size(
+                params.get("image_size"), params.get("aspect_ratio"), image_b64_list
+            )
+        else:
+            mapped_size = self._map_image_size(
+                params.get("image_size"), params.get("aspect_ratio")
+            )
         if mapped_size:
             form["size"] = mapped_size
 

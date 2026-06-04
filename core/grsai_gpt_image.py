@@ -182,12 +182,17 @@ class GrsaiGPTImageProvider(BaseProvider):
         urls = [u.strip() for u in urls if isinstance(u, str) and u.strip()]
         image_data_urls = self._build_data_urls(image_b64_list)
 
+        aspect_ratio = self._resolve_payload_size(
+            params.get("aspect_ratio"), image_b64_list
+        )
         payload: dict = {
             "model": model,
             "prompt": prompt,
-            "size": self._resolve_payload_size(
-                params.get("aspect_ratio"), image_b64_list
-            ),
+            "images": image_data_urls or urls,
+            "aspectRatio": aspect_ratio,
+            "replyType": "json",
+            "moderation": "low",
+            "background": "auto",
         }
         quality = params.get("quality")
         if isinstance(quality, str) and quality.strip().lower() in {
@@ -198,12 +203,8 @@ class GrsaiGPTImageProvider(BaseProvider):
         }:
             payload["quality"] = quality.strip().lower()
         logger.info(
-            f"[GPT Image] request size={payload['size']}, quality={payload.get('quality', 'auto')}, aspect_ratio={params.get('aspect_ratio')}, reference_images={len(image_data_urls)}"
+            f"[GPT Image] request aspectRatio={aspect_ratio}, quality={payload.get('quality', 'auto')}, aspect_ratio={params.get('aspect_ratio')}, reference_images={len(payload['images'])}"
         )
-        if image_data_urls:
-            payload["urls"] = image_data_urls
-        elif urls:
-            payload["urls"] = urls
 
         draw_url = self._resolve_draw_url(provider_config.api_url)
         try:
@@ -306,19 +307,44 @@ class GrsaiGPTImageProvider(BaseProvider):
                     detail = self._extract_error_message(resp_text)
                     if detail:
                         return None, 400, f"图片生成失败: {detail}"
-                    # 尝试轮询模式：检查是否有 task_id
-                    task_id = None
-                    data_obj = data.get("data")
-                    if isinstance(data_obj, dict):
-                        tid = data_obj.get("id")
-                        if isinstance(tid, str) and tid.strip():
-                            task_id = tid.strip()
-                    if task_id:
-                        return await self._poll_result(
-                            provider_config, headers, task_id, verify, impersonate
-                        )
+                    status = data.get("status")
+                    if status == "succeeded" or data.get("progress") == 100:
+                        results = data.get("results")
+                        if isinstance(results, list):
+                            for item in results:
+                                if isinstance(item, dict):
+                                    u = item.get("url")
+                                    if isinstance(u, str) and u.strip():
+                                        result_url_list.append(u.strip())
+                        url = data.get("url")
+                        if isinstance(url, str) and url.strip():
+                            result_url_list.append(url.strip())
+                    if not result_url_list:
+                        if status in {"failed", "violation"}:
+                            reason = (
+                                data.get("error")
+                                or data.get("message")
+                                or data.get("failure_reason")
+                                or status
+                            )
+                            return None, 400, f"图片生成失败: {reason}"
+                        # 尝试轮询模式：检查是否有 task_id
+                        task_id = None
+                        root_id = data.get("id")
+                        if isinstance(root_id, str) and root_id.strip():
+                            task_id = root_id.strip()
+                        data_obj = data.get("data")
+                        if isinstance(data_obj, dict):
+                            tid = data_obj.get("id")
+                            if isinstance(tid, str) and tid.strip():
+                                task_id = tid.strip()
+                        if task_id:
+                            return await self._poll_result(
+                                provider_config, headers, task_id, verify, impersonate
+                            )
 
-                return None, 200, "响应中未包含图片数据"
+                if not result_url_list:
+                    return None, 200, "响应中未包含图片数据"
 
             result_url_list = list(dict.fromkeys(result_url_list))
             b64_images = await self.downloader.fetch_media(result_url_list)
@@ -573,6 +599,8 @@ class GrsaiGPTImageVIPProvider(GrsaiGPTImageProvider):
             "images": images,
             "aspectRatio": aspect_ratio,
             "replyType": "json",
+            "moderation": "low",
+            "background": "auto",
         }
         logger.info(
             f"[GPT Image VIP] request aspectRatio={aspect_ratio}, image_size={params.get('image_size')}, reference_images={len(images)}"
