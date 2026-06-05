@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import base64
 import json
 import os
@@ -2929,6 +2929,9 @@ class AIImage(Star):
                     clear_cache(task_temp_dir)
                 event.stop_event()
             return
+
+        # 已命中明确插件触发词或预设名，立即阻止 AstrBot 后续 LLM/tool-call 再处理同一条消息。
+        event.stop_event()
 
         # 群白名单判断
         if (
