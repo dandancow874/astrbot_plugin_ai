@@ -1241,6 +1241,45 @@ class AIImage(Star):
                 providers = provider_list
 
             if conf_key == "gpt_image_config" and isinstance(providers, list):
+                target_existing = next(
+                    (
+                        m
+                        for m in models_data
+                        if isinstance(m, dict) and m.get("name") == name
+                    ),
+                    None,
+                )
+                existing_providers = (
+                    target_existing.get("providers", [])
+                    if isinstance(target_existing, dict)
+                    else []
+                )
+                if isinstance(existing_providers, list):
+                    for existing_provider in existing_providers:
+                        if not isinstance(existing_provider, dict):
+                            continue
+                        existing_name = str(existing_provider.get("name", "") or "").strip()
+                        existing_sig = (
+                            str(existing_provider.get("api_type", "") or "").strip(),
+                            str(existing_provider.get("api_url", "") or "").strip(),
+                            str(existing_provider.get("model", "") or "").strip(),
+                        )
+                        if any(
+                            isinstance(item, dict)
+                            and (
+                                str(item.get("name", "") or "").strip() == existing_name
+                                or (
+                                    str(item.get("api_type", "") or "").strip(),
+                                    str(item.get("api_url", "") or "").strip(),
+                                    str(item.get("model", "") or "").strip(),
+                                )
+                                == existing_sig
+                            )
+                            for item in providers
+                        ):
+                            continue
+                        providers.append(existing_provider)
+
                 providers = [
                     item
                     for item in providers
