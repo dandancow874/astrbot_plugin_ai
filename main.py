@@ -1252,6 +1252,55 @@ class AIImage(Star):
                         )
                     )
                 ]
+                secondary_conf = model_conf.get("secondary", {})
+                if not isinstance(secondary_conf, dict):
+                    secondary_conf = {}
+                secondary_url = secondary_conf.get("api_url", "")
+                secondary_key = secondary_conf.get("api_key", "")
+                secondary_api_type = secondary_conf.get("api_type", "")
+                secondary_model = secondary_conf.get("model", "")
+                if (
+                    str(secondary_api_type).strip()
+                    or str(secondary_url).strip()
+                    or str(secondary_key).strip()
+                    or str(secondary_model).strip()
+                ):
+                    secondary_data = build_provider_item(
+                        {
+                            "api_type": secondary_api_type,
+                            "api_url": secondary_url,
+                            "api_key": secondary_key,
+                            "model": secondary_model,
+                            "tls_verify": secondary_conf.get("tls_verify", None),
+                            "impersonate": secondary_conf.get("impersonate", None),
+                            "concurrency_limit": secondary_conf.get(
+                                "concurrency_limit", 4
+                            ),
+                        },
+                        "备",
+                    )
+                    secondary_sig = (
+                        str(secondary_data.get("api_type", "") or "").strip(),
+                        str(secondary_data.get("api_url", "") or "").strip(),
+                        str(secondary_data.get("model", "") or "").strip(),
+                    )
+                    has_secondary = any(
+                        isinstance(item, dict)
+                        and (
+                            str(item.get("name", "") or "").strip()
+                            == str(secondary_data.get("name", "") or "").strip()
+                            or (
+                                str(item.get("api_type", "") or "").strip(),
+                                str(item.get("api_url", "") or "").strip(),
+                                str(item.get("model", "") or "").strip(),
+                            )
+                            == secondary_sig
+                        )
+                        for item in providers
+                    )
+                    if not has_secondary:
+                        providers.append(secondary_data)
+
                 yunwu_conf = model_conf.get("yunwu", {})
                 if not isinstance(yunwu_conf, dict):
                     yunwu_conf = {}
@@ -3896,6 +3945,15 @@ class AIImage(Star):
 
         if not candidate_providers:
             return None, f"模型 {target_model.name} 未配置有效的提供商。"
+
+        logger.info(
+            "[AI IMAGE] Candidate providers for "
+            f"{target_model.name}: "
+            + ", ".join(
+                f"{p.name}(type={p.api_type}, model={p.model}, keys={len(p.keys)})"
+                for p in candidate_providers
+            )
+        )
 
         # 调度提供商
         for i, provider in enumerate(candidate_providers):
