@@ -1457,10 +1457,10 @@ class AIImage(Star):
             default_provider_stub={
                 "name": "Grok账号",
                 "enabled": True,
-                "api_type": "OpenAI_Images",
+                "api_type": "OpenAI_Chat",
                 "keys": [],
-                "api_url": "http://localhost:8000/v1",
-                "model": "grok-imagine-1.0",
+                "api_url": "http://localhost:8000/v1/chat/completions",
+                "model": "grok-imagine-image-lite",
                 "stream": False,
             },
             insert_index=6,
@@ -1580,8 +1580,8 @@ class AIImage(Star):
                 self.prompt_dict[cmd] = params
 
         fixed_prompts: dict[str, str] = {
-            "gp1": "gp1 {{user_text}} --min_images 0 --model grok-imagine-1.0 --aspect_ratio 2:3 --n 2",
-            "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-1.0-edit --aspect_ratio 2:3 --n 2",
+            "gp1": "gp1 {{user_text}} --min_images 0 --model grok-imagine-image-lite --aspect_ratio 2:3 --n 2",
+            "gp2": "gp2 {{user_text}} --min_images 1 --model grok-imagine-image-lite --aspect_ratio 2:3 --n 2",
             "gpt1": "gpt1 {{user_text}} --min_images 0 --aspect_ratio 9:16",
             "gpt2": "gpt2 {{user_text}} --min_images 1 --aspect_ratio auto",
             "cf": "cf {{user_text}} --min_images 0",
@@ -3866,7 +3866,12 @@ class AIImage(Star):
         target_provider_name = params.get("provider")
 
         filtered_by_model_applied = False
-        if requested_provider_model and not target_provider_name:
+        should_filter_by_provider_model = bool(
+            requested_provider_model
+            and not target_provider_name
+            and params.get("__user_overrode_model__", False)
+        )
+        if should_filter_by_provider_model:
             filtered_by_model = [
                 p
                 for p in candidate_providers
@@ -3954,6 +3959,10 @@ class AIImage(Star):
                     params=call_params,
                     image_b64_list=image_b64_list,
                 )
+            except Exception as e:
+                images_result = None
+                err = f"图片生成失败：提供商 {provider.name} 调用异常：{e}"
+                logger.error(err, exc_info=True)
             finally:
                 self._release_provider_slot(provider_slot)
             if (
