@@ -109,58 +109,6 @@
                         "default": "chrome131"
                     }
                 }
-            },
-            "secondary": {
-                "description": "备用提供商 (grsai)",
-                "type": "object",
-                "hint": "主提供商失败后会自动尝试备用提供商。留空则不启用。",
-                "items": {
-                    "api_type": {
-                        "description": "接口类型",
-                        "type": "string",
-                        "options": [
-                            "Grsai_GPT_Image",
-                            "OpenAI_Images",
-                            "OpenAI_Chat"
-                        ],
-                        "default": "Grsai_GPT_Image",
-                        "hint": "普通 grsai GPT Image 2 使用 Grsai_GPT_Image。"
-                    },
-                    "api_url": {
-                        "description": "备用 API 地址",
-                        "type": "string",
-                        "default": "",
-                        "hint": "例如 https://api.grsai.com 或 https://api.grsai.cn。留空则不启用备用提供商。"
-                    },
-                    "api_key": {
-                        "description": "备用 API Key",
-                        "type": "string",
-                        "default": "",
-                        "hint": "直接粘贴备用 Key。多个 Key 可用英文逗号或换行分隔。"
-                    },
-                    "model": {
-                        "description": "备用模型名称",
-                        "type": "string",
-                        "default": "gpt-image-2",
-                        "hint": "普通 GPT Image 2 填 gpt-image-2。"
-                    },
-                    "concurrency_limit": {
-                        "description": "并发数",
-                        "type": "int",
-                        "default": 4,
-                        "hint": "该供应商最多同时运行的生图任务数。"
-                    },
-                    "tls_verify": {
-                        "description": "TLS证书验证",
-                        "type": "bool",
-                        "default": true
-                    },
-                    "impersonate": {
-                        "description": "TLS/UA 指纹伪装",
-                        "type": "string",
-                        "default": "chrome131"
-                    }
-                }
             }
         }
     },
@@ -351,6 +299,58 @@
                         "type": "string",
                         "default": "",
                         "hint": "直接粘贴 grsai API Key。多个 Key 可用英文逗号或换行分隔。"
+                    },
+                    "tls_verify": {
+                        "description": "TLS证书验证",
+                        "type": "bool",
+                        "default": true
+                    },
+                    "impersonate": {
+                        "description": "TLS/UA 指纹伪装",
+                        "type": "string",
+                        "default": "chrome131"
+                    }
+                }
+            },
+            "secondary": {
+                "description": "备用提供商 (grsai)",
+                "type": "object",
+                "hint": "主提供商失败后会自动尝试备用提供商。留空则不启用。",
+                "items": {
+                    "api_type": {
+                        "description": "接口类型",
+                        "type": "string",
+                        "options": [
+                            "Grsai_GPT_Image",
+                            "OpenAI_Images",
+                            "OpenAI_Chat"
+                        ],
+                        "default": "Grsai_GPT_Image",
+                        "hint": "普通 grsai GPT Image 2 使用 Grsai_GPT_Image。"
+                    },
+                    "api_url": {
+                        "description": "备用 API 地址",
+                        "type": "string",
+                        "default": "",
+                        "hint": "例如 https://api.grsai.com 或 https://api.grsai.cn。留空则不启用备用提供商。"
+                    },
+                    "api_key": {
+                        "description": "备用 API Key",
+                        "type": "string",
+                        "default": "",
+                        "hint": "直接粘贴备用 Key。多个 Key 可用英文逗号或换行分隔。"
+                    },
+                    "model": {
+                        "description": "备用模型名称",
+                        "type": "string",
+                        "default": "gpt-image-2",
+                        "hint": "普通 GPT Image 2 填 gpt-image-2。"
+                    },
+                    "concurrency_limit": {
+                        "description": "并发数",
+                        "type": "int",
+                        "default": 4,
+                        "hint": "该供应商最多同时运行的生图任务数。"
                     },
                     "tls_verify": {
                         "description": "TLS证书验证",
