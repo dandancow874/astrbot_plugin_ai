@@ -3910,7 +3910,11 @@ class AIImage(Star):
         # 如果是通过默认模型 / 模型切换 / 简化触发词选中的模型，沿用 1/2 触发词的默认参数。
         # 例如 GPT-Image-2：无图沿用 gpt1 的 9:16，带图沿用 gpt2 的 auto。
         trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
-        prefer_i2i = bool(image_b64_list)
+        source_image_urls = params.get("__source_image_urls__")
+        prefer_i2i = bool(image_b64_list) or (
+            isinstance(source_image_urls, list)
+            and any(isinstance(url, str) and url.strip() for url in source_image_urls)
+        )
         if trigger_cmd not in set(target_model.triggers or []) or self._is_simplified_image_trigger(trigger_cmd):
             selected_trigger = ""
             if self._is_simplified_image_trigger(trigger_cmd):
@@ -3943,7 +3947,7 @@ class AIImage(Star):
                     params.setdefault(key, value)
                 if selected_trigger:
                     logger.info(
-                        f"[AI IMAGE] 默认模型沿用触发词参数: model={target_model.name}, trigger={selected_trigger}, aspect_ratio={params.get('aspect_ratio')}"
+                        f"[AI IMAGE] 默认模型沿用触发词参数: model={target_model.name}, trigger={selected_trigger}, prefer_i2i={prefer_i2i}, aspect_ratio={params.get('aspect_ratio')}"
                     )
 
         # 2. 获取该模型的提供商列表
