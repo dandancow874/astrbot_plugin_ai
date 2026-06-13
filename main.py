@@ -3429,7 +3429,6 @@ class AIImage(Star):
         if referer_id is None:
             referer_id = []
         trigger_cmd = str(params.get("__trigger_cmd__") or "").strip()
-        is_i2i_mode = trigger_cmd in {"bp2", "edit", "bt2", "mj2", "nj2", "gpt2"}
         use_at_avatar = bool(params.get("avatar", False))
         avatar_image_urls: list[str] = []
         direct_image_urls: list[str] = list(image_urls)
@@ -3526,6 +3525,42 @@ class AIImage(Star):
         available_image_count = (
             len(image_urls) + len(image_b64_list) + len(id_image_b64_list)
         )
+        effective_trigger_cmd = trigger_cmd
+        if self._is_simplified_image_trigger(trigger_cmd):
+            effective_trigger_cmd = self._legacy_mode_trigger(
+                trigger_cmd, available_image_count > 0
+            )
+        is_i2i_mode = effective_trigger_cmd in {
+            "bp2",
+            "edit",
+            "bt2",
+            "mj2",
+            "nj2",
+            "gpt2",
+            "gp2",
+        }
+        if effective_trigger_cmd != trigger_cmd:
+            logger.info(
+                f"[AI IMAGE] 简化触发词 {trigger_cmd} 按图片数量映射为 {effective_trigger_cmd}，available_images={available_image_count}"
+            )
+            trigger_defaults = self.prompt_dict.get(effective_trigger_cmd, {})
+            if isinstance(trigger_defaults, dict):
+                for key, value in trigger_defaults.items():
+                    if key in {"prompt", "__model_name__"}:
+                        continue
+                    if key == "aspect_ratio" and params.get("__user_overrode_aspect_ratio__"):
+                        continue
+                    if key == "image_size" and params.get("__user_overrode_image_size__"):
+                        continue
+                    if key == "model" and params.get("__user_overrode_model__"):
+                        continue
+                    params.setdefault(key, value)
+                min_required_images = params.get(
+                    "min_images", self.prompt_config.min_images
+                )
+                max_allowed_images = params.get(
+                    "max_images", self.prompt_config.max_images
+                )
         if is_i2i_mode and available_image_count < min_required_images:
             warn_msg = f"图片数量不足，最少需要 {min_required_images} 张图片，当前仅 {available_image_count} 张"
             logger.warning(warn_msg)
@@ -3542,6 +3577,9 @@ class AIImage(Star):
             fetched = await self.downloader.fetch_images(image_urls[:append_count])
             if fetched:
                 image_b64_list.extend(fetched)
+            logger.info(
+                f"[AI IMAGE] 参考图下载: urls={len(image_urls[:append_count])}, fetched={len(fetched or [])}, b64_total={len(image_b64_list)}, id_images={len(id_image_b64_list)}, i2i={is_i2i_mode}"
+            )
 
             # 如果 min_required_images 为 0，列表为空是允许的
             # 图生图模式才检查图片下载失败
