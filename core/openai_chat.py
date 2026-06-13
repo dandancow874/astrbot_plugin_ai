@@ -1219,11 +1219,12 @@ class OpenAIImagesProvider(BaseProvider):
         body: dict = {
             "prompt": params.get("prompt", "anything"),
             "model": self._resolve_request_model(provider_config, params),
-            "response_format": "b64_json",
         }
         if is_yunwu:
             body["moderation"] = "low"
             body["background"] = "auto"
+        else:
+            body["response_format"] = "b64_json"
 
         # 处理生成数量参数 n
         n_param = params.get("n")
@@ -1399,7 +1400,6 @@ class OpenAIImagesProvider(BaseProvider):
         form: dict = {
             "prompt": params.get("prompt", "anything"),
             "model": self._resolve_request_model(provider_config, params),
-            "response_format": "b64_json",
         }
         if is_yunwu:
             form["moderation"] = "low"
@@ -1408,6 +1408,7 @@ class OpenAIImagesProvider(BaseProvider):
                 params.get("image_size"), params.get("aspect_ratio"), image_b64_list
             )
         else:
+            form["response_format"] = "b64_json"
             mapped_size = self._map_image_size(
                 params.get("image_size"), params.get("aspect_ratio")
             )
@@ -1431,7 +1432,6 @@ class OpenAIImagesProvider(BaseProvider):
                 data=raw,
             )
             has_any_image = True
-            break
 
         if not has_any_image:
             return None, 400, "图片编辑失败：输入图片格式错误"

@@ -48,7 +48,7 @@ class GrsaiGPTImageProvider(BaseProvider):
             root = raw[: -len("/v1")]
         if "/chat/completions" in root.lower():
             root = root.split("/chat/completions", 1)[0]
-        return root.rstrip("/") + "/v1/draw/completions"
+        return root.rstrip("/") + "/v1/api/generate"
 
     @staticmethod
     def _resolve_result_url(api_url: str) -> str:
@@ -185,10 +185,11 @@ class GrsaiGPTImageProvider(BaseProvider):
         aspect_ratio = self._resolve_payload_size(
             params.get("aspect_ratio"), image_b64_list
         )
+        images = urls or image_data_urls
         payload: dict = {
             "model": model,
             "prompt": prompt,
-            "images": image_data_urls or urls,
+            "images": images,
             "aspectRatio": aspect_ratio,
             "replyType": "json",
             "moderation": "low",
@@ -203,7 +204,7 @@ class GrsaiGPTImageProvider(BaseProvider):
         }:
             payload["quality"] = quality.strip().lower()
         logger.info(
-            f"[GPT Image] request aspectRatio={aspect_ratio}, quality={payload.get('quality', 'auto')}, aspect_ratio={params.get('aspect_ratio')}, reference_images={len(payload['images'])}"
+            f"[GPT Image] request aspectRatio={aspect_ratio}, quality={payload.get('quality', 'auto')}, aspect_ratio={params.get('aspect_ratio')}, reference_images={len(images)}, image_source={'url' if urls else 'data_url'}"
         )
 
         draw_url = self._resolve_draw_url(provider_config.api_url)
