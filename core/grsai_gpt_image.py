@@ -163,6 +163,13 @@ class GrsaiGPTImageProvider(BaseProvider):
             data_urls.append(f"data:{mime_type};base64,{b64}")
         return data_urls
 
+    @staticmethod
+    def _merge_reference_images(urls: list[str], data_urls: list[str]) -> list[str]:
+        if urls and len(data_urls) > len(urls):
+            extra_count = len(data_urls) - len(urls)
+            return list(dict.fromkeys(urls + data_urls[:extra_count]))
+        return urls or data_urls
+
     async def _call_api(
         self,
         provider_config: ProviderConfig,
@@ -185,7 +192,7 @@ class GrsaiGPTImageProvider(BaseProvider):
         aspect_ratio = self._resolve_payload_size(
             params.get("aspect_ratio"), image_b64_list
         )
-        images = urls or image_data_urls
+        images = self._merge_reference_images(urls, image_data_urls)
         payload: dict = {
             "model": model,
             "prompt": prompt,
@@ -589,7 +596,7 @@ class GrsaiGPTImageVIPProvider(GrsaiGPTImageProvider):
             urls = []
         urls = [u.strip() for u in urls if isinstance(u, str) and u.strip()]
         image_data_urls = self._build_data_urls(image_b64_list)
-        images = image_data_urls or urls
+        images = self._merge_reference_images(urls, image_data_urls)
 
         aspect_ratio = self._resolve_vip_aspect_ratio(
             params.get("aspect_ratio"), params.get("image_size"), image_b64_list
